@@ -115,7 +115,53 @@ class JARVIS:
         self.tts_voice = tts_voice  # Options: alloy, echo, fable, onyx, nova, shimmer
         self.tts_model = tts_model  # tts-1 or tts-1-hd for higher quality
         
+        # Load system instructions
+        self.system_instructions = self._load_instructions()
+        
         print(f"🤖 JARVIS initialized with collection: {self.collection_name}")
+    
+    def _load_instructions(self) -> str:
+        """Load system instructions from file."""
+        instructions_file = pathlib.Path("jarvis_instructions.txt")
+        
+        if instructions_file.exists():
+            try:
+                instructions = instructions_file.read_text(encoding="utf-8")
+                print("📋 Loaded system instructions")
+                return instructions
+            except Exception as e:
+                print(f"⚠️ Could not load instructions: {e}")
+        
+        # Default instructions if file doesn't exist
+        return """You are JARVIS, an intelligent AI assistant. 
+Be helpful, accurate, and concise. Use provided context when available."""
+    
+    def reload_instructions(self, instructions_path: Optional[str] = None) -> bool:
+        """
+        Reload system instructions from file.
+        
+        Args:
+            instructions_path: Optional path to instructions file (default: jarvis_instructions.txt)
+        
+        Returns:
+            True if successfully reloaded
+        """
+        if instructions_path:
+            instructions_file = pathlib.Path(instructions_path)
+        else:
+            instructions_file = pathlib.Path("jarvis_instructions.txt")
+        
+        if not instructions_file.exists():
+            print(f"❌ Instructions file not found: {instructions_file}")
+            return False
+        
+        try:
+            self.system_instructions = instructions_file.read_text(encoding="utf-8")
+            print(f"✅ Reloaded instructions from {instructions_file}")
+            return True
+        except Exception as e:
+            print(f"❌ Error reloading instructions: {e}")
+            return False
     
     def _embed_documents(self, texts: List[str]) -> List[List[float]]:
         """Generate embeddings for multiple documents."""
@@ -210,7 +256,8 @@ class JARVIS:
         self,
         directory: str,
         chunk_size: int = 2000,
-        chunk_overlap: int = 200
+        chunk_overlap: int = 200,
+        recursive: bool = False
     ) -> int:
         """
         Add all .txt and .pdf files from a directory to context.
@@ -219,6 +266,7 @@ class JARVIS:
             directory: Path to directory containing documents
             chunk_size: Size of text chunks for vector storage
             chunk_overlap: Overlap between chunks
+            recursive: If True, search subdirectories recursively
         
         Returns:
             Total number of chunks added
@@ -229,16 +277,29 @@ class JARVIS:
             raise FileNotFoundError(f"Directory not found: {directory}")
         
         total_chunks = 0
-        for file in directory.glob("*"):
-            if file.suffix.lower() in [".txt", ".pdf"]:
-                chunks = self.add_context_from_file(
-                    str(file),
-                    chunk_size=chunk_size,
-                    chunk_overlap=chunk_overlap
-                )
-                total_chunks += chunks
+        file_count = 0
         
-        print(f"📚 Total: {total_chunks} chunks from directory")
+        # Choose glob pattern based on recursive flag
+        if recursive:
+            pattern = "**/*"
+            print(f"🔍 Recursively searching {directory} for documents...")
+        else:
+            pattern = "*"
+        
+        for file in directory.glob(pattern):
+            if file.is_file() and file.suffix.lower() in [".txt", ".pdf"]:
+                try:
+                    chunks = self.add_context_from_file(
+                        str(file),
+                        chunk_size=chunk_size,
+                        chunk_overlap=chunk_overlap
+                    )
+                    total_chunks += chunks
+                    file_count += 1
+                except Exception as e:
+                    print(f"⚠️ Error processing {file.name}: {e}")
+        
+        print(f"📚 Total: {total_chunks} chunks from {file_count} files")
         return total_chunks
     
     def add_context_from_text(
@@ -341,10 +402,7 @@ class JARVIS:
         
         # Build prompt
         if system_prompt is None:
-            system_prompt = """You are JARVIS, an intelligent AI assistant.
-Use the provided context to answer questions accurately and helpfully.
-If the context doesn't contain relevant information, use your general knowledge
-but indicate when you're doing so."""
+            system_prompt = self.system_instructions
         
         messages = [{"role": "system", "content": system_prompt}]
         
