@@ -1,7 +1,7 @@
 
         JARVIS AI Assistant
         
-        I am JARVIS, an AI voice assistant created for SwanHacks 2025.
+        I am JARVIS, an AI voice assistant created for nurses.
         
         What I can do:
         - Listen to voice commands
@@ -20,6 +20,4 @@
         - Context-aware responses
         - Document search integration
         - Natural conversation flow
-        
-        I'm configured to use NoiseTorch for noise cancellation!
         

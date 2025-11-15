@@ -6,6 +6,7 @@ Uses sounddevice for reliable microphone input with wake word detection
 
 from JARVIS import create_jarvis
 import time
+import os
 from datetime import datetime
 
 def print_microphone_info(jarvis):
@@ -74,6 +75,7 @@ def listen_for_wake_word(jarvis, wake_word="jarvis", frame_duration=2):
 def main():
     # Create JARVIS instance
     print("Initializing JARVIS...")
+    print("(Loading system instructions from jarvis_instructions.txt)")
     jarvis = create_jarvis()
     
     # Print microphone information
@@ -83,22 +85,36 @@ def main():
     print("\n🔧 Setting up microphone...")
     jarvis.setup_microphone(device_name_prefix="PCM", auto_select=True)
     
-    # Optional: Add some context
-    # jarvis.add_context_from_file("jarvis_kb.txt")
+    # Load context from output folder and knowledge base
+    print("\n📚 Loading context...")
+    try:
+        # Recursively add all .txt files from output folder
+        if os.path.exists("output"):
+            chunks = jarvis.add_context_from_directory("output", recursive=True)
+            if chunks > 0:
+                print(f"✅ Loaded context from output folder")
+        
+        # Add knowledge base if it exists
+        if os.path.exists("jarvis_kb.txt"):
+            jarvis.add_context_from_file("jarvis_kb.txt")
+            print(f"✅ Loaded jarvis_kb.txt")
+    except Exception as e:
+        print(f"⚠️ Warning loading context: {e}")
     
     print("\n" + "="*60)
     print("🎙️  JARVIS Wake Word Demo with Voice Response")
     print("="*60)
     print("\n✨ Say 'JARVIS' to activate the assistant")
     print("   Then speak your command")
-    print("\n💡 Tips:")
+    print("\n💡 Features:")
     print("   - Continuous listening with 2-second frames")
     print("   - Speak clearly and say 'JARVIS' to wake up")
-    print("   - JARVIS will automatically stop listening when you finish talking")
-    print("   - JARVIS will speak the response using OpenAI TTS! 🔊")
-    print("   - Each response is saved as jarvis_response_TIMESTAMP.mp3 💾")
+    print("   - Auto-stop listening when you finish talking")
+    print("   - OpenAI TTS voice responses 🔊")
+    print("   - Each response saved as jarvis_response_TIMESTAMP.mp3 💾")
+    print("   - Context loaded from output/ folder and jarvis_kb.txt 📚")
     print("   - Press Ctrl+C to exit")
-    print("\n⚙️  Technical: Auto-stop after 1.5s of silence, OpenAI TTS voice: 'alloy'")
+    print("\n⚙️  Technical: Auto-stop after 1.5s of silence, OpenAI TTS-HD voice: 'alloy'")
     print("="*60 + "\n")
     
     frame_count = 0
