@@ -395,7 +395,7 @@ def transcribe_chunk(audio_file):
 # -----------------------------
 # FINAL REPORT GENERATION
 # -----------------------------
-def generate_report(events, audio_transcript):
+def generate_report(events, audio_transcript, session_date_str, session_time_str):
     history = json.dumps(events, indent=2)
 
     prompt = f"""
@@ -413,6 +413,9 @@ EVENT JSON (visual + audio):
 
 AUDIO TRANSCRIPT:
 {audio_transcript}
+
+Today's date: {session_date_str}
+Session start time: {session_time_str}
 
 Write a full incident report including:
 - Summary
@@ -461,6 +464,10 @@ def save_output(report, audio_file, frames, session_folder):
 def main():
     # Create output folder
     session_ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    session_datetime = datetime.now()
+    session_date_str = session_datetime.strftime("%B %d, %Y")
+    session_time_str = session_datetime.strftime("%I:%M %p")
+
     session_folder = f"output/session_{session_ts}"
     os.makedirs(session_folder, exist_ok=True)
 
@@ -542,7 +549,7 @@ def main():
     full_audio_text = transcribe_chunk(audio_filename)
 
     print("📄 Generating final report...")
-    report = generate_report(events, full_audio_text)
+    report = generate_report(events, full_audio_text, session_date_str, session_time_str)
 
     save_output(report, audio_filename, frames_collected, session_folder)
 
