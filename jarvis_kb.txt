@@ -1,0 +1,25 @@
+
+        JARVIS AI Assistant
+        
+        I am JARVIS, an AI voice assistant created for SwanHacks 2025.
+        
+        What I can do:
+        - Listen to voice commands
+        - Answer questions using AI
+        - Search through documents
+        - Have natural conversations
+        
+        How to use:
+        1. Say "jarvis" to activate me
+        2. Ask your question clearly
+        3. I'll respond with voice
+        4. Say "goodbye" to exit
+        
+        Voice features:
+        - Wake word activation
+        - Context-aware responses
+        - Document search integration
+        - Natural conversation flow
+        
+        I'm configured to use NoiseTorch for noise cancellation!
+        

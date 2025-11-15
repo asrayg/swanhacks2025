@@ -1,3 +1,30 @@
+# JARVIS Library Dependencies
+# Core AI and ML libraries
+openai>=1.12.0
+python-dotenv>=1.0.0
+
+# Vector database
+chromadb>=0.4.22
+
+# Document processing
+PyPDF2>=3.0.0
+
+# Optional: Web interface (if you want to use the Flask example)
+flask>=3.0.0
+
+# Optional: For advanced features
+numpy>=1.24.0
+
+# Speech recognition
+SpeechRecognition>=3.10.0
+sounddevice>=0.4.6  # Modern alternative to PyAudio, works better with virtual devices
+# pyaudio>=0.2.13  # Note: May require system dependencies (portaudio19-dev on Linux) - REPLACED by sounddevice
+
+# Note: TTS uses OpenAI API. For audio playback, install one of:
+# - mpv (recommended): sudo pacman -S mpv
+# - ffmpeg: sudo pacman -S ffmpeg
+# - pulseaudio: sudo pacman -S pulseaudio
+
 supervision
 openai
 opencv-python
