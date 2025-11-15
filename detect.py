@@ -96,6 +96,24 @@ class AudioRecorder:
         wf.close()
         return True
 
+def detect_shutdown_command(text):
+    if not text:
+        return False
+
+    text = text.lower()
+
+    shutdown_phrases = [
+        "stop monitoring",
+        "stop the system",
+        "stop detection",
+        "shutdown",
+        "shut down",
+        "end session",
+        "terminate session"
+    ]
+
+    return any(phrase in text for phrase in shutdown_phrases)
+
 def generate_dynamic_vitals():
     """Generate slightly varying but realistic medical vitals."""
     
@@ -482,6 +500,10 @@ def main():
                 text = transcribe_chunk(chunk_file)
                 if text:
                     audio_context.append(text)
+                    if detect_shutdown_command(text):
+                        print("\n🛑 Voice shutdown command detected!")
+                        print("   → Ending session safely...\n")
+                        break
                     issue = detect_audio_keywords(text)
                     if issue:
                         print(f"🚨 AUDIO FLAG: {issue}")
