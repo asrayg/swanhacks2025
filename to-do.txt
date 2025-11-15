@@ -1,6 +1,8 @@
 Tasks 
 - [] Make a thing to look at agression indicators ()
 - [] Make something that looks at medical anomalys (Heart Shit, brown urine, something with peanuts near an allergic patient)
-- [] Easy access chart on screen
+- [] Easy access chart on screen (we'll Generate dummy context)
 - [] Get shit 
-- [] Autopages based on shit
+- [] Pages based on shit (like security for agression, a specific doctor for specific shit - Generate a fake context text file for this) 
+- [] Should access audio too so it can add to context async with video
+- [] Generate final notes and report
