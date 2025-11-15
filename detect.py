@@ -11,10 +11,19 @@ import wave
 import threading
 import re
 import random
+from supabase import create_client, Client
 
 
 load_dotenv()
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
+# -----------------------------
+# SUPABASE CONFIGURATION
+# -----------------------------
+SUPABASE_URL = "https://lfvpbnzpsxxgppnlzhln.supabase.co"
+SUPABASE_SERVICE_ROLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxmdnBibnpwc3h4Z3Bwbmx6aGxuIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2MzIzMzg5MCwiZXhwIjoyMDc4ODA5ODkwfQ.W8W03HO2-uRUrwBqfDFnd203s1NMUkgYiI3oRlPqHBg"
+
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
 
 # -----------------------------
 # CONFIGURABLE CONTEXT
@@ -455,7 +464,56 @@ def save_output(report, audio_file, frames, session_folder):
         cv2.imwrite(os.path.join(session_folder, f"frame_{i:04d}.jpg"), frame)
 
     print(f"📁 Saved all output → {session_folder}")
+    
+    # Post to Supabase
+    try:
+        post_to_supabase(report_path, audio_path)
+    except Exception as e:
+        print(f"⚠️ Error posting to Supabase: {e}")
+    
     return report_path
+
+
+# -----------------------------
+# POST TO SUPABASE
+# -----------------------------
+def post_to_supabase(report_path, audio_path):
+    """Post the report and audio file to Supabase Expo table."""
+    try:
+        # Read the report text content
+        with open(report_path, "r", encoding="utf-8") as f:
+            report_content = f.read()
+        
+        # Get absolute paths for the files
+        abs_report_path = os.path.abspath(report_path)
+        abs_audio_path = os.path.abspath(audio_path)
+        
+        # For Video column, store the audio file path
+        # You can modify this to upload to Supabase Storage and get a public URL instead
+        video_value = abs_audio_path
+        
+        # Generate a unique ID (or let Supabase auto-generate)
+        # We'll let Supabase auto-generate the ID by not providing it
+        
+        print("📤 Posting to Supabase...")
+        
+        # Insert into Expo table
+        response = supabase.table("Expo").insert({
+            "Report": report_content,
+            "Video": video_value
+        }).execute()
+        
+        if response.data:
+            print(f"✅ Successfully posted to Supabase!")
+            print(f"   Record ID: {response.data[0].get('id', 'N/A')}")
+            print(f"   Report length: {len(report_content)} characters")
+            print(f"   Audio file: {abs_audio_path}")
+        else:
+            print("⚠️ No data returned from Supabase insert")
+            
+    except Exception as e:
+        print(f"❌ Error posting to Supabase: {e}")
+        raise
 
 
 # -----------------------------
