@@ -79,7 +79,7 @@ export default function ReportDetailScreen() {
         />
         <VitalCard
           icon="testtube.2"
-          label="Blood Alcohol"
+          label="Blood Oxygen"
           value={report.bloodAlcohol.toString()}
           unit="%"
           color="#F39C12"
@@ -141,7 +141,7 @@ function VitalCard({
       </View>
       <ThemedText style={[
         styles.vitalLabel,
-        (label === 'Blood Alcohol' || label === 'Blood Pressure') && styles.vitalLabelSmall
+        (label === 'Blood Oxygen' || label === 'Blood Pressure') && styles.vitalLabelSmall
       ]}>{label}</ThemedText>
       <View style={styles.vitalValueContainer}>
         <ThemedText style={[
