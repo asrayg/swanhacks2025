@@ -1,0 +1,6 @@
+Tasks 
+- [] Make a thing to look at agression indicators ()
+- [] Make something that looks at medical anomalys (Heart Shit, brown urine, something with peanuts near an allergic patient)
+- [] Easy access chart on screen
+- [] Get shit 
+- [] Autopages based on shit
