@@ -584,9 +584,16 @@ def save_output(report, audio_file, frames, session_folder):
 # MAIN LOOP
 # -----------------------------
 def main():
+    print("1")
+    
     global oled
+    print("2")
+
     oled = OLED_1in51()
+    print("3")
+
     oled.Init()
+    print("4")
 
     print("🔵 please STARTED")
 
@@ -678,4 +685,6 @@ def main():
     print("\n✅ Session complete.")
 
 if __name__ == "__main__":
+    print("yooo")
     main()
+    print("noooo")
