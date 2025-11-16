@@ -584,6 +584,11 @@ Be helpful, accurate, and concise. Use provided context when available."""
             )
             sd.wait()  # Wait until recording is finished
             
+            # Debug: Check audio levels
+            audio_max = np.abs(audio_data).max()
+            if audio_max < 100:  # Very quiet audio
+                print(f"⚠️ Warning: Audio level very low ({audio_max}). Check microphone volume!")
+            
             # Convert to WAV format in memory
             wav_io = io.BytesIO()
             with wave.open(wav_io, 'wb') as wav_file:
@@ -608,20 +613,25 @@ Be helpful, accurate, and concise. Use provided context when available."""
             return text
         
         except sr.UnknownValueError:
+            # Google couldn't understand the audio
+            # This usually means audio is too quiet, corrupted, or just silence/noise
             return None
         
-        except sr.RequestError:
+        except sr.RequestError as e:
+            print(f"❌ Google API request failed: {e}")
             return None
         
-        except Exception:
+        except Exception as e:
+            print(f"❌ Recognition error: {e}")
             return None
     
     def listen_with_silence_detection(
         self,
         max_duration: int = 30,
-        silence_threshold: int = 1500,
+        silence_threshold: int = 15000,
         silence_duration: float = 1.5,
-        language: str = "en-US"
+        language: str = "en-US",
+        auto_calibrate: bool = True
     ) -> Optional[str]:
         """
         Listen to microphone and automatically stop when user stops talking.
@@ -629,9 +639,10 @@ Be helpful, accurate, and concise. Use provided context when available."""
         
         Args:
             max_duration: Maximum recording duration in seconds
-            silence_threshold: Energy threshold below which is considered silence
+            silence_threshold: Energy threshold below which is considered silence (ignored if auto_calibrate=True)
             silence_duration: Seconds of silence before stopping
             language: Language code (e.g., 'en-US', 'es-ES')
+            auto_calibrate: Automatically calibrate noise floor (recommended for noisy environments)
         
         Returns:
             Transcribed text or None if recognition failed
@@ -647,6 +658,27 @@ Be helpful, accurate, and concise. Use provided context when available."""
             sample_rate = int(self.mic_device['default_samplerate'])
             channels = 1
             chunk_duration = 0.5  # 500ms chunks (safer for virtual devices)
+            
+            # Auto-calibrate noise floor
+            if auto_calibrate:
+                print("🔧 Calibrating noise floor... (stay quiet for 2 seconds)")
+                calibration_samples = []
+                for _ in range(4):  # 4 chunks = 2 seconds
+                    chunk_data = sd.rec(
+                        int(chunk_duration * sample_rate),
+                        samplerate=sample_rate,
+                        channels=channels,
+                        dtype='int16',
+                        device=self.mic_device_index
+                    )
+                    sd.wait()
+                    energy = np.abs(chunk_data).mean()
+                    calibration_samples.append(energy)
+                
+                # Set threshold as 2.5x the average background noise
+                avg_noise = np.mean(calibration_samples)
+                silence_threshold = avg_noise 
+                print(f"✅ Noise floor: {avg_noise:.0f}, Speech threshold: {silence_threshold:.0f}")
             
             print(f"🎤 Listening... Speak now! (stops automatically when you finish)")
             
