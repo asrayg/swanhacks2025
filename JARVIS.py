@@ -677,7 +677,7 @@ Be helpful, accurate, and concise. Use provided context when available."""
                 
                 # Set threshold as 2.5x the average background noise
                 avg_noise = np.mean(calibration_samples)
-                silence_threshold = avg_noise * 1.5
+                silence_threshold = avg_noise 
                 print(f"✅ Noise floor: {avg_noise:.0f}, Speech threshold: {silence_threshold:.0f}")
             
             print(f"🎤 Listening... Speak now! (stops automatically when you finish)")

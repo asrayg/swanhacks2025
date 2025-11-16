@@ -43,7 +43,7 @@ class SpanishEnglishTranslator:
             
             # Set threshold as 2.5x the average background noise
             avg_noise = np.mean(calibration_samples)
-            self.silence_threshold = avg_noise * 1.5
+            self.silence_threshold = avg_noise
             self.calibrated = True
             print(f"✅ Noise floor: {avg_noise:.0f}, Speech threshold: {self.silence_threshold:.0f}")
         
