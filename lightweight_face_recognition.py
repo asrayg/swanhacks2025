@@ -52,11 +52,36 @@ class LightweightFaceRecognizer:
         
         # Initialize face detector
         if detection_method == self.HAAR_CASCADE:
-            cascade_path = cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
+            # Try multiple possible locations for Haar Cascade
+            cascade_paths = [
+                # Try cv2.data first (if available)
+                getattr(cv2.data, 'haarcascades', '') + 'haarcascade_frontalface_default.xml' if hasattr(cv2, 'data') else '',
+                # Common system paths on Raspberry Pi / Linux
+                '/usr/share/opencv4/haarcascades/haarcascade_frontalface_default.xml',
+                '/usr/share/opencv/haarcascades/haarcascade_frontalface_default.xml',
+                # Local copy
+                'haarcascade_frontalface_default.xml'
+            ]
+            
+            cascade_path = None
+            for path in cascade_paths:
+                if path and os.path.exists(path):
+                    cascade_path = path
+                    break
+            
+            if cascade_path is None:
+                # Download if not found
+                print("📥 Haar Cascade not found locally, downloading...")
+                cascade_path = 'haarcascade_frontalface_default.xml'
+                import urllib.request
+                url = 'https://raw.githubusercontent.com/opencv/opencv/master/data/haarcascades/haarcascade_frontalface_default.xml'
+                urllib.request.urlretrieve(url, cascade_path)
+                print("✅ Downloaded Haar Cascade")
+            
             self.face_cascade = cv2.CascadeClassifier(cascade_path)
             if self.face_cascade.empty():
                 raise RuntimeError(f"Failed to load Haar Cascade from {cascade_path}")
-            print("✅ Loaded Haar Cascade face detector")
+            print(f"✅ Loaded Haar Cascade face detector from {cascade_path}")
             
         elif detection_method == self.DNN_CAFFE:
             # Download models if not present
@@ -68,13 +93,19 @@ class LightweightFaceRecognizer:
         
         # Initialize face recognizer
         if recognition_method == self.LBPH:
-            self.recognizer = cv2.face.LBPHFaceRecognizer_create(
-                radius=1,
-                neighbors=8,
-                grid_x=8,
-                grid_y=8
-            )
-            print("✅ Initialized LBPH face recognizer")
+            try:
+                self.recognizer = cv2.face.LBPHFaceRecognizer_create(
+                    radius=1,
+                    neighbors=8,
+                    grid_x=8,
+                    grid_y=8
+                )
+                print("✅ Initialized LBPH face recognizer")
+            except AttributeError:
+                print("⚠️  cv2.face module not available (need opencv-contrib-python)")
+                print("    Falling back to TEMPLATE recognition method...")
+                self.recognition_method = self.TEMPLATE
+                print("✅ Using template matching instead")
         
         self.known_faces = {}  # {name: face_template/encoding}
         self.label_to_name = {}
