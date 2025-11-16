@@ -245,7 +245,7 @@ def realtime_routing_alert(result):
         return
 
     if routing == "emergency":
-        oled_print(oled,"Emergency Response Activated:\n   Notifying all security units:")
+        oled_print("EMERGENCY RESPONSE ACTIVATED:\n    Notifying all security units:")
         for unit, eta in security_units.items():
             oled_print(oled,f"       - {unit} -> ETA {eta}")
         name, eta = doctors_available["emergency"]
@@ -257,17 +257,26 @@ def realtime_routing_alert(result):
     # ---------------------------------------------------------
     if routing == "doctor":
         name, eta = doctors_available["general"]
-        oled_print(oled,f"DOCTOR PAGED:\n   - {name} -> ETA {eta} minutes\n   - Issue: {issue}")
+        oled_print("DOCTOR PAGED:")
+        oled_print(f"   {name}  ETA {eta} minutes")
+        oled_print(f"   Issue: {issue}")
+        print("--------------------------------------------------")
         return
 
     if routing == "allergy":
         name, eta = doctors_available["allergy"]
-        oled_print(oled,f"ALLERGY SPECIALIST PAGED:\n   - {name} -> ETA {eta} minutes\n   - Trigger: {issue}")
+        oled_print("ALLERGY SPECIALIST PAGED:")
+        oled_print(f"    {name}  ETA {eta} minutes")
+        oled_print(f"    Trigger: {issue}")
+        print("--------------------------------------------------")
         return
 
     if routing == "injury":
         name, eta = doctors_available["injury"]
-        oled_print(oled,f"TRAUMA/INJURY PHYSICIAN PAGED:\n   - {name} -> ETA {eta} minutes\n   - Issue: {issue}")
+        oled_print("TRAUMA/INJURY PHYSICIAN PAGED:")
+        oled_print(f"    {name}  ETA {eta} minutes")
+        oled_print(f"    Issue: {issue}")
+        print("--------------------------------------------------")
         return
 
     # ---------------------------------------------------------
@@ -661,8 +670,8 @@ def main():
                 if text:
                     audio_context.append(text)
                     if detect_shutdown_command(text):
-                        oled_print(oled, "\n🛑 Voice shutdown command detected!")
-                        print("   → Ending session safely...\n")
+                        oled_print("\nVoice shutdown command detected!")
+                        oled_print("    Ending session safely...\n")
                         break
                     issue = detect_audio_keywords(text)
                     if issue:
