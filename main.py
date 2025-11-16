@@ -31,9 +31,9 @@ def listen_for_wake_words(jarvis, frame_duration=2):
     print(text)
     if text:
         text_lower = text.lower()
-        if text_lower.contains("jeff"):
+        if "jeff" in text_lower:
             return "jeff"
-        elif text_lower.contains("translate")   :
+        elif "translate" in text_lower:
             return "translate"
     
     return None
