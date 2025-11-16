@@ -11,28 +11,17 @@ import wave
 import threading
 import re
 import random
-from supabase import create_client, Client
-from driver import OLED_1in51, OLED_WIDTH, OLED_HEIGHT
 import subprocess
-
-# Capture frame using rpicam-still (works even without /dev/video0)
-def capture_frame(path="/dev/shm/frame.jpg"):
-    cmd = [
-        "rpicam-still",
-        "-t", "1",            # no preview delay
-        "--width", "640",
-        "--height", "480",
-        "-n",                 # no preview window
-        "-o", path
-    ]
-    subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    return cv2.imread(path)
-
+from supabase import create_client, Client
+from PIL import Image, ImageDraw, ImageFont
+from driver import OLED_1in51, OLED_WIDTH, OLED_HEIGHT
+import numpy as np
+oled = None
 
 load_dotenv()
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-oled = OLED_1in51()
-oled.Init()
+
+
 
 # -----------------------------
 # SUPABASE CONFIGURATION
@@ -63,6 +52,47 @@ security_units = {
     "Unit B": "4 minutes away"
 }
 
+def oled_print(text, size=9):
+    global oled
+
+    # Create blank image
+    image = Image.new("1", (OLED_WIDTH, OLED_HEIGHT), 255)
+    draw = ImageDraw.Draw(image)
+
+    # Smaller readable font
+    try:
+        font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", size)
+    except:
+        font = ImageFont.load_default()
+
+    # Split text into lines (approx 18 chars/line)
+    words = text.split()
+    line = ""
+    lines = []
+    for w in words:
+        if len(line) + len(w) < 18:
+            line += " " + w
+        else:
+            lines.append(line.strip())
+            line = w
+    lines.append(line.strip())
+
+    # Draw max 4 lines
+    y = 0
+    for ln in lines[:4]:
+        draw.text((0, y), ln, font=font, fill=0)
+        y += size + 3
+
+    # Rotate entire screen upside down
+    image = image.rotate(180)
+
+    # Send output
+    buf = oled.getbuffer(image)
+    oled.ShowImage(buf)
+
+    # Slow output so text doesn’t flicker/flash too fast
+    time.sleep(0.4)
+
 
 # -----------------------------
 # AUDIO RECORDER (continuous)
@@ -76,18 +106,32 @@ class AudioRecorder:
     def __init__(self):
         self.frames = []
         self.is_recording = False
-        self.audio = pyaudio.PyAudio()
+        self.audio = None
+        self.stream = None
 
     def start(self):
+        print("🎤 Initializing audio...")
+        try:
+            import pyaudio
+            self.audio = pyaudio.PyAudio()
+            self.stream = self.audio.open(
+                format=pyaudio.paInt16,
+                channels=1,
+                rate=44100,
+                input=True,
+                frames_per_buffer=1024
+            )
+        except Exception as e:
+            print("❌ Mic initialization failed:", e)
+            print("➡️ Continuing WITHOUT audio.")
+            self.audio = None
+            return  # disable audio completely
+
         self.is_recording = True
-        self.stream = self.audio.open(
-            format=AUDIO_FORMAT, channels=CHANNELS,
-            rate=RATE, input=True, frames_per_buffer=CHUNK
-        )
 
         def record():
             while self.is_recording:
-                data = self.stream.read(CHUNK, exception_on_overflow=False)
+                data = self.stream.read(1024, exception_on_overflow=False)
                 self.frames.append(data)
 
         self.thread = threading.Thread(target=record)
@@ -95,15 +139,19 @@ class AudioRecorder:
         print("Audio recording started (continuous)")
 
     def stop_and_save_full_audio(self, filename):
+        if not self.audio:
+            print("⚠️ No audio was recorded.")
+            return
+
         self.is_recording = False
         self.thread.join()
         self.stream.stop_stream()
         self.stream.close()
 
-        wf = wave.open(filename, 'wb')
-        wf.setnchannels(CHANNELS)
+        wf = wave.open(filename, "wb")
+        wf.setnchannels(1)
         wf.setsampwidth(self.audio.get_sample_size(AUDIO_FORMAT))
-        wf.setframerate(RATE)
+        wf.setframerate(44100)
         wf.writeframes(b''.join(self.frames))
         wf.close()
 
@@ -111,16 +159,36 @@ class AudioRecorder:
         print(f"Full session audio saved to: {filename}")
 
     def save_chunk(self, chunk_filename):
-        num_frames = int(5 * RATE / CHUNK)
-        chunk_data = self.frames[-num_frames:] if len(self.frames) >= num_frames else self.frames
+        if not self.audio:
+            return False
 
-        wf = wave.open(chunk_filename, 'wb')
-        wf.setnchannels(CHANNELS)
+        num_frames = int(5 * RATE / CHUNK)
+        chunk_data = (
+            self.frames[-num_frames:] if len(self.frames) >= num_frames else self.frames
+        )
+
+        wf = wave.open(chunk_filename, "wb")
+        wf.setnchannels(1)
         wf.setsampwidth(self.audio.get_sample_size(AUDIO_FORMAT))
-        wf.setframerate(RATE)
-        wf.writeframes(b''.join(chunk_data))
+        wf.setframerate(44100)
+        wf.writeframes(b"".join(chunk_data))
         wf.close()
+
         return True
+
+    
+def capture_frame(path="/dev/shm/frame.jpg"):
+    """Reliable single-frame capture using rpicam-still (headless-safe)."""
+    cmd = [
+        "rpicam-still",
+        "-t", "1",        # tiny timeout for capture
+        "--width", "640",
+        "--height", "480",
+        "-n",             # no preview
+        "-o", path
+    ]
+    subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    return cv2.imread(path)
 
 def detect_shutdown_command(text):
     if not text:
@@ -165,6 +233,7 @@ def realtime_routing_alert(result):
     aggro = result.get("aggression", False)
     level = result.get("aggression_level", 0)
 
+    print("\n📡 ROUTING STATUS UPDATE ---------------------------")
 
     # ---------------------------------------------------------
     # SECURITY RESPONSE
@@ -398,7 +467,7 @@ def transcribe_chunk(audio_file):
 # -----------------------------
 # FINAL REPORT GENERATION
 # -----------------------------
-def generate_report(events, audio_transcript, session_date_str, session_time_str):
+def generate_report(events, audio_transcript):
     history = json.dumps(events, indent=2)
 
     prompt = f"""
@@ -416,9 +485,6 @@ EVENT JSON (visual + audio):
 
 AUDIO TRANSCRIPT:
 {audio_transcript}
-
-Today's date: {session_date_str}
-Session start time: {session_time_str}
 
 Write a full incident report including:
 - Summary
@@ -509,20 +575,53 @@ def post_to_supabase(report_path, audio_path):
         print(f"Error posting to Supabase: {e}")
         raise
 
-def oled_print(oled, text):
-    print(text)                 # terminal
-    oled.display_text_upside_down(text, 18)  # OLED
+
+# -----------------------------
+# SAVE REPORT + MEDIA
+# -----------------------------
+def save_output(report, audio_file, frames, session_folder):
+    report_path = os.path.join(session_folder, "report.txt")
+    audio_path = os.path.join(session_folder, audio_file)
+
+    # Save report
+    with open(report_path, "w") as f:
+        f.write(report)
+
+    # Move audio file
+    os.rename(audio_file, audio_path)
+
+    # Save frames
+    for i, frame in enumerate(frames):
+        cv2.imwrite(os.path.join(session_folder, f"frame_{i:04d}.jpg"), frame)
+
+    print(f"📁 Saved all output → {session_folder}")
+    try:
+        post_to_supabase(report_path, audio_path)
+    except Exception as e:
+        print(f"⚠️ Error posting to Supabase: {e}")
+
+    return report_path
 
 
 # -----------------------------
 # MAIN LOOP
 # -----------------------------
 def main():
-    session_ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-    session_datetime = datetime.now()
-    session_date_str = session_datetime.strftime("%B %d, %Y")
-    session_time_str = session_datetime.strftime("%I:%M %p")
+    print("1")
+    
+    global oled
+    print("2")
 
+    oled = OLED_1in51()
+    print("3")
+
+    oled.Init()
+    print("4")
+
+    print("🔵 please STARTED")
+
+    # Create output folder
+    session_ts = datetime.now().strftime("%Y%m%d_%H%M%S")
     session_folder = f"output/session_{session_ts}"
     os.makedirs(session_folder, exist_ok=True)
 
@@ -536,7 +635,7 @@ def main():
     frames_collected = []
     events = []
 
-    oled_print(oled, "Monitoring...")
+    print("🎥 Monitoring started... Press Q to quit.")
 
     last_audio_time = 0
     last_frame_time = 0
@@ -544,9 +643,7 @@ def main():
 
     try:
         while True:
-            # -------------------------
-            # CAPTURE FRAME FROM PI CAM
-            # -------------------------
+            # ---- CAPTURE FRAME FROM PI CAMERA ----
             frame = capture_frame()
             if frame is None:
                 print("Warning: Frame capture failed, retrying...")
@@ -555,9 +652,7 @@ def main():
             frames_collected.append(frame.copy())
             now = time.time()
 
-            # ------------------------------------
-            # AUDIO CHUNK EVERY 5 SECONDS
-            # ------------------------------------
+            # ---- AUDIO SAMPLE EVERY 5s ----
             if now - last_audio_time > 5:
                 chunk_file = "temp_audio.wav"
                 audio_rec.save_chunk(chunk_file)
@@ -565,21 +660,17 @@ def main():
                 text = transcribe_chunk(chunk_file)
                 if text:
                     audio_context.append(text)
-
                     if detect_shutdown_command(text):
-                        oled_print(oled, "\nVoice shutdown command detected!")
-                        print("   -> Ending session safely...\n")
+                        oled_print(oled, "\n🛑 Voice shutdown command detected!")
+                        print("   → Ending session safely...\n")
                         break
-
                     issue = detect_audio_keywords(text)
                     if issue:
-                        print(f"AUDIO FLAG: {issue}")
+                        print(f"🚨 AUDIO FLAG: {issue}")
 
                 last_audio_time = now
 
-            # ------------------------------------
-            # FRAME ANALYSIS EVERY 1.5 SECONDS
-            # ------------------------------------
+            # ---- FRAME ANALYSIS EVERY 1.5s ----
             if now - last_frame_time > 1.5:
                 result = analyze_frame(frame)
                 result["timestamp"] = now - session_start
@@ -594,7 +685,7 @@ def main():
                 realtime_routing_alert(result)
                 last_frame_time = now
 
-            # Manual shutdown support
+            # Manual shutdown
             key = cv2.waitKey(1) & 0xFF
             if key == ord("q") or key == ord("s"):
                 print("\nManual shutdown triggered.")
@@ -616,3 +707,8 @@ def main():
     save_output(report, audio_filename, frames_collected, session_folder)
 
     print("\nSession complete.")
+
+if __name__ == "__main__":
+    print("yooo")
+    main()
+    print("noooo")
