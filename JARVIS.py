@@ -595,23 +595,25 @@ Be helpful, accurate, and concise. Use provided context when available."""
             # Reset to beginning of BytesIO
             wav_io.seek(0)
             
-            # Give the BytesIO object a name attribute for OpenAI API
-            wav_io.name = "audio.wav"
+            # Use speech_recognition to transcribe
+            with sr.AudioFile(wav_io) as source:
+                audio = self.recognizer.record(source)
             
-            # Extract language code (convert 'en-US' to 'en', etc.)
-            lang_code = language.split('-')[0] if language else 'en'
-            
-            # Transcribe using OpenAI Whisper
-            transcription = self.client.audio.transcriptions.create(
-                model="whisper-1",
-                file=wav_io,
-                language=lang_code
+            # Recognize speech using Google Speech Recognition
+            text = self.recognizer.recognize_google(
+                audio,
+                language=language
             )
             
-            return transcription.text
+            return text
+        
+        except sr.UnknownValueError:
+            return None
+        
+        except sr.RequestError:
+            return None
         
         except Exception:
-            # Handle any API errors or transcription failures
             return None
     
     def listen_with_silence_detection(

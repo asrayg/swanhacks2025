@@ -8,237 +8,23 @@ import os
 from datetime import datetime
 import tempfile
 import subprocess
-import threading
-
-# OLED Display imports
-try:
-    import board
-    import digitalio
-    import busio
-    from PIL import Image, ImageDraw, ImageFont
-    OLED_AVAILABLE = True
-except ImportError:
-    OLED_AVAILABLE = False
-    print("⚠️ OLED libraries not available. Display features disabled.")
 
 load_dotenv()
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-# OLED Constants
-OLED_WIDTH = 128
-OLED_HEIGHT = 64
-
-
-class OLED_1in51:
-    """OLED Display controller for 128x64 SSD1306-based displays"""
-    
-    def __init__(self):
-        if not OLED_AVAILABLE:
-            raise RuntimeError("OLED libraries not available")
-        
-        # SPI
-        self.spi = busio.SPI(board.SCLK, MOSI=board.MOSI)
-        
-        # Pins
-        self.dc = digitalio.DigitalInOut(board.D24)
-        self.rst = digitalio.DigitalInOut(board.D25)
-        self.cs = digitalio.DigitalInOut(board.D8)
-        for pin in [self.dc, self.rst, self.cs]:
-            pin.direction = digitalio.Direction.OUTPUT
-        
-        # Configure SPI
-        while not self.spi.try_lock():
-            pass
-        self.spi.configure(baudrate=8000000, phase=0, polarity=0)
-        self.spi.unlock()
-        
-        self.width = OLED_WIDTH
-        self.height = OLED_HEIGHT
-        
-        print("✅ OLED Display initialized")
-    
-    def command(self, cmd):
-        """Send command to OLED"""
-        self.dc.value = 0
-        self.cs.value = 0
-        self.spi.write(bytes([cmd]))
-        self.cs.value = 1
-    
-    def data(self, data):
-        """Send data to OLED"""
-        self.dc.value = 1
-        self.cs.value = 0
-        self.spi.write(data)
-        self.cs.value = 1
-    
-    def reset(self):
-        """Hardware reset of OLED"""
-        self.rst.value = 0
-        time.sleep(0.2)
-        self.rst.value = 1
-        time.sleep(0.2)
-    
-    def init(self):
-        """Initialize OLED with standard SSD1306 commands"""
-        self.reset()
-        cmds = [
-            0xAE,  # Display OFF
-            0xD5, 0xA0,  # Set display clock
-            0xA8, 0x3F,  # Set multiplex ratio
-            0xD3, 0x00,  # Set display offset
-            0x40,  # Set start line
-            0xA1,  # Set segment remap
-            0xC8,  # Set COM scan direction
-            0xDA, 0x12,  # Set COM pins
-            0x81, 0x7F,  # Set contrast
-            0xA4,  # Display follows RAM
-            0xA6,  # Normal display (not inverted)
-            0xD9, 0xF1,  # Set pre-charge period
-            0xDB, 0x40,  # Set VCOMH deselect level
-            0xAF  # Display ON
-        ]
-        for c in cmds:
-            self.command(c)
-    
-    def getbuffer(self, image):
-        """Convert PIL image to OLED buffer format"""
-        buf = [0x00] * (self.width * self.height // 8)
-        img = image.convert("1")
-        pixels = img.load()
-        for y in range(self.height):
-            for x in range(self.width):
-                if pixels[x, y] == 0:
-                    buf[x + (y // 8) * self.width] |= (1 << (y % 8))
-        return buf
-    
-    def show_image(self, buf):
-        """Display buffer on OLED"""
-        for page in range(8):
-            self.command(0xB0 + page)  # Set page address
-            self.command(0x00)  # Set lower column address
-            self.command(0x10)  # Set higher column address
-            start = page * 128
-            end = start + 128
-            self.data(bytes(buf[start:end]))
-    
-    def clear(self):
-        """Clear the display"""
-        img = Image.new("1", (self.width, self.height), "white")
-        buf = self.getbuffer(img)
-        self.show_image(buf)
-    
-    def scroll_text(self, text, font_size=16, scroll_speed=0.05):
-        """
-        Scroll text horizontally across the display.
-        
-        Args:
-            text: Text to display
-            font_size: Font size in pixels
-            scroll_speed: Delay between scroll steps (seconds)
-        """
-        try:
-            # Try to load a nice font
-            font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", font_size)
-        except:
-            # Fall back to default font
-            font = ImageFont.load_default()
-        
-        # Create a temporary image to measure text width
-        temp_img = Image.new("1", (1, 1), "white")
-        temp_draw = ImageDraw.Draw(temp_img)
-        bbox = temp_draw.textbbox((0, 0), text, font=font)
-        text_width = bbox[2] - bbox[0]
-        text_height = bbox[3] - bbox[1]
-        
-        # Calculate vertical centering
-        y_pos = (self.height - text_height) // 2
-        
-        # Scroll from right to left
-        for x_offset in range(self.width, -text_width - 10, -2):
-            img = Image.new("1", (self.width, self.height), "white")
-            draw = ImageDraw.Draw(img)
-            draw.text((x_offset, y_pos), text, fill="black", font=font)
-            
-            buf = self.getbuffer(img)
-            self.show_image(buf)
-            time.sleep(scroll_speed)
-        
-        # Clear display after scrolling
-        self.clear()
-
-
 class SpanishEnglishTranslator:
     def __init__(self):
         self.is_running = False
-        self.sample_rate = 44100  # CD quality, standard for plughw
-        self.channels = 2  # Stereo
+        self.sample_rate = 16000
+        self.channels = 1
         self.silence_threshold = 1500  # Energy threshold for silence
         self.silence_duration = 1.5  # Seconds of silence before stopping
         
-        # Setup microphone device (plughw:2,0)
-        self.mic_device = None
-        self.mic_device_index = None
-        self._setup_microphone()
-        
-        # Initialize OLED display if available
-        self.oled = None
-        if OLED_AVAILABLE:
-            try:
-                self.oled = OLED_1in51()
-                self.oled.init()
-                self.oled.clear()
-                print("📺 OLED Display ready for translations")
-            except Exception as e:
-                print(f"⚠️ Could not initialize OLED: {e}")
-                self.oled = None
-        else:
-            print("ℹ️ Running without OLED display")
-    
-    def list_audio_devices(self):
-        """List all available audio devices"""
-        print("\n📋 Available Audio Devices:")
-        print("="*60)
-        devices = sd.query_devices()
-        for idx, device in enumerate(devices):
-            if device['max_input_channels'] > 0:
-                print(f"  [{idx}] {device['name']}")
-                print(f"      Input Channels: {device['max_input_channels']}")
-                print(f"      Sample Rate: {device['default_samplerate']} Hz")
-        print("="*60 + "\n")
-    
-    def _setup_microphone(self):
-        """Setup microphone to use default device"""
-        try:
-            devices = sd.query_devices()
-            default_input = sd.default.device[0]
-            
-            if default_input is not None:
-                self.mic_device_index = default_input
-                self.mic_device = devices[default_input]
-                self.sample_rate = int(self.mic_device['default_samplerate'])
-                print(f"\n✅ Using default microphone:")
-                print(f"   Device: {self.mic_device['name']}")
-                print(f"   Index: {default_input}")
-                print(f"   Sample rate: {self.sample_rate} Hz")
-                print(f"   Channels: {self.mic_device['max_input_channels']}")
-            else:
-                print("\n✅ Using system default microphone")
-                self.mic_device_index = None
-            
-        except Exception as e:
-            print(f"\n❌ Error setting up microphone: {e}")
-            import traceback
-            traceback.print_exc()
-            print("   Will use system default device")
-            self.mic_device_index = None
-        
     def record_with_silence_detection(self, max_duration=30):
-        """Record audio until silence is detected with live visualization"""
+        """Record audio until silence is detected"""
         chunk_duration = 0.5  # 500ms chunks
         
-        print("\n" + "="*70)
-        print("🎤 LIVE AUDIO MONITORING")
-        print("="*70)
+        print("🎤 Listening... Speak now!", end="\r")
         
         # Storage for audio data
         all_audio_chunks = []
@@ -246,24 +32,13 @@ class SpanishEnglishTranslator:
         has_speech = False
         total_time = 0
         
-        # Determine actual channels to use
-        actual_channels = self.channels
-        if self.mic_device:
-            actual_channels = min(self.channels, self.mic_device['max_input_channels'])
-        
-        # For live transcription attempts
-        transcribe_interval = 2.0  # Try to transcribe every 2 seconds
-        last_transcribe_time = 0
-        partial_transcript = ""
-        
         while total_time < max_duration and self.is_running:
             # Record a chunk
             chunk_data = sd.rec(
                 int(chunk_duration * self.sample_rate),
                 samplerate=self.sample_rate,
-                channels=actual_channels,
-                dtype='int16',
-                device=self.mic_device_index
+                channels=self.channels,
+                dtype='int16'
             )
             sd.wait()  # Wait for chunk to complete
             
@@ -273,126 +48,40 @@ class SpanishEnglishTranslator:
             # Calculate energy (volume) of chunk
             energy = np.abs(chunk_data).mean()
             
-            # Create visual audio level meter
-            meter_width = 50
-            energy_normalized = min(energy / 3000, 1.0)  # Normalize to 0-1
-            filled_bars = int(energy_normalized * meter_width)
-            meter = "█" * filled_bars + "░" * (meter_width - filled_bars)
-            
-            # Status display
             if energy > self.silence_threshold:
                 # Speech detected
                 silence_time = 0
                 has_speech = True
-                status = f"🔴 SPEAKING [{total_time:5.1f}s] {meter} {int(energy):5d}"
+                print("🎤 Listening... (speaking detected)", end="\r")
             else:
                 # Silence detected
                 if has_speech:
                     silence_time += chunk_duration
-                    status = f"🟡 SILENCE  [{total_time:5.1f}s] {meter} {int(energy):5d} (pause: {silence_time:.1f}s)"
-                else:
-                    status = f"🟢 WAITING  [{total_time:5.1f}s] {meter} {int(energy):5d}"
-            
-            # Print status on same line
-            print(f"\r{status}", end="", flush=True)
-            
-            # Attempt live transcription every N seconds
-            if has_speech and (total_time - last_transcribe_time) >= transcribe_interval:
-                last_transcribe_time = total_time
-                try:
-                    # Try to transcribe recent audio
-                    self._attempt_live_transcription(all_audio_chunks, actual_channels)
-                except:
-                    pass  # Ignore transcription errors during live monitoring
+                    print(f"🎤 Listening... (silence {silence_time:.1f}s)", end="\r")
             
             # Stop if we've had enough silence after speech
             if has_speech and silence_time >= self.silence_duration:
-                print(f"\n{'='*70}")
-                print("✅ Speech ended, processing final transcription...")
+                print("\n✅ Speech ended, processing...       ")
                 break
         
         if not has_speech:
-            print(f"\n{'='*70}")
-            print("⚠️  No speech detected")
-            print("="*70 + "\n")
+            print("\n⚠️  No speech detected                ")
             return None
         
         # Concatenate all audio chunks
         audio_data = np.concatenate(all_audio_chunks, axis=0)
-        
-        # Convert stereo to mono if needed (for Whisper compatibility)
-        if actual_channels == 2 and len(audio_data.shape) > 1:
-            # Average the two channels to create mono
-            audio_data = audio_data.mean(axis=1).astype('int16')
-            final_channels = 1
-        else:
-            final_channels = actual_channels
         
         # Save to temp file
         with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as temp_file:
             temp_filename = temp_file.name
             
         with wave.open(temp_filename, 'wb') as wf:
-            wf.setnchannels(final_channels)
+            wf.setnchannels(self.channels)
             wf.setsampwidth(2)  # 2 bytes for int16
             wf.setframerate(self.sample_rate)
             wf.writeframes(audio_data.tobytes())
         
         return temp_filename
-    
-    def _attempt_live_transcription(self, audio_chunks, channels):
-        """Attempt to transcribe recent audio chunks and display live"""
-        try:
-            # Use last 3 seconds of audio for live transcription
-            recent_duration = 3.0
-            chunks_to_use = int(recent_duration / 0.5)
-            recent_chunks = audio_chunks[-chunks_to_use:] if len(audio_chunks) > chunks_to_use else audio_chunks
-            
-            if not recent_chunks:
-                return
-            
-            # Concatenate recent audio
-            audio_data = np.concatenate(recent_chunks, axis=0)
-            
-            # Convert stereo to mono if needed
-            if channels == 2 and len(audio_data.shape) > 1:
-                audio_data = audio_data.mean(axis=1).astype('int16')
-                final_channels = 1
-            else:
-                final_channels = channels
-            
-            # Save to temp file
-            with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as temp_file:
-                temp_filename = temp_file.name
-            
-            with wave.open(temp_filename, 'wb') as wf:
-                wf.setnchannels(final_channels)
-                wf.setsampwidth(2)
-                wf.setframerate(self.sample_rate)
-                wf.writeframes(audio_data.tobytes())
-            
-            # Quick transcription (no verbose mode to save time)
-            with open(temp_filename, "rb") as f:
-                transcript = client.audio.transcriptions.create(
-                    model="whisper-1",
-                    file=f
-                )
-            
-            # Clean up temp file
-            try:
-                os.remove(temp_filename)
-            except:
-                pass
-            
-            if transcript.text.strip():
-                # Display live transcript on a new line
-                print(f"\n💬 Live: \"{transcript.text.strip()}\"")
-                # Return cursor to status line
-                print("", end="", flush=True)
-        
-        except Exception as e:
-            # Silently fail for live transcription
-            pass
     
     def transcribe_audio(self, audio_file):
         """Transcribe audio and detect language"""
@@ -466,30 +155,10 @@ class SpanishEnglishTranslator:
                     }
                 ]
             )
-            english_text = translation.choices[0].message.content.strip()
-            
-            # Display on OLED if available (in background thread)
-            if self.oled:
-                display_thread = threading.Thread(
-                    target=self._display_translation,
-                    args=(english_text,),
-                    daemon=True
-                )
-                display_thread.start()
-            
-            return english_text
+            return translation.choices[0].message.content.strip()
         except Exception as e:
             print(f"❌ Error in Spanish→English translation: {e}")
             return None
-    
-    def _display_translation(self, text):
-        """Display translation on OLED screen (runs in background thread)"""
-        try:
-            if self.oled:
-                print("📺 Displaying on OLED...")
-                self.oled.scroll_text(text, font_size=18, scroll_speed=0.03)
-        except Exception as e:
-            print(f"⚠️ Error displaying on OLED: {e}")
     
     def translate_to_spanish(self, english_text):
         """Translate English to Spanish"""
@@ -576,13 +245,13 @@ class SpanishEnglishTranslator:
                     time.sleep(0.5)
                     continue
                 
-                print("⚙️  Transcribing final audio...", end="\r")
+                print("⚙️  Transcribing...", end="\r")
                 
                 # Transcribe
                 text, detected_lang = self.transcribe_audio(audio_file)
                 
                 if not text:
-                    print("\n🟢 Ready for next input...\n")
+                    print("🟢 Ready for next input...   \n")
                     continue
                 
                 timestamp = datetime.now().strftime("%H:%M:%S")
@@ -592,43 +261,38 @@ class SpanishEnglishTranslator:
                 
                 if language == "spanish":
                     # Spanish → English
-                    print(f"\n{'='*70}")
-                    print(f"📝 FINAL TRANSCRIPTION [{timestamp}]")
-                    print(f"{'='*70}")
-                    print(f"🇪🇸 SPANISH: {text}")
-                    print(f"   (Whisper detected: {detected_lang})")
-                    print(f"{'-'*70}")
-                    print(f"🔄 Translating Spanish → English...")
+                    print(f"\n{'='*60}")
+                    print(f"[{timestamp}] 🇪🇸 SPANISH DETECTED:")
+                    print(f"  {text}")
+                    print(f"  (Detected: {detected_lang})")
                     
                     english_translation = self.translate_to_english(text)
                     
                     if english_translation:
-                        print(f"🇬🇧 ENGLISH: {english_translation}")
-                        print(f"{'-'*70}")
-                        print(f"🔊 Speaking translation in English...")
+                        print(f"\n[{timestamp}] 🇬🇧 ENGLISH TRANSLATION:")
+                        print(f"  {english_translation}")
+                        print(f"\n🔊 Speaking in English...")
                         self.speak_text(english_translation)
-                        print(f"✅ Complete!")
-                    print(f"{'='*70}\n")
+                        print(f"✅ TTS completed")
+                    print(f"{'='*60}")
                     
                 else:  # English
                     # English → Spanish
-                    print(f"\n{'='*70}")
-                    print(f"📝 FINAL TRANSCRIPTION [{timestamp}]")
-                    print(f"{'='*70}")
-                    print(f"🇬🇧 ENGLISH: {text}")
-                    print(f"   (Whisper detected: {detected_lang})")
-                    print(f"{'-'*70}")
-                    print(f"🔄 Translating English → Spanish...")
+                    print(f"\n{'='*60}")
+                    print(f"[{timestamp}] 🇬🇧 ENGLISH DETECTED:")
+                    print(f"  {text}")
+                    print(f"  (Detected: {detected_lang})")
                     
                     spanish_translation = self.translate_to_spanish(text)
                     
                     if spanish_translation:
-                        print(f"🇪🇸 SPANISH: {spanish_translation}")
-                        print(f"{'-'*70}")
-                        print(f"🔊 Speaking translation in Spanish...")
+                        print(f"\n[{timestamp}] 🇪🇸 SPANISH TRANSLATION:")
+                        print(f"  {spanish_translation}")
+                        
+                        print(f"\n🔊 Speaking in Spanish...")
                         self.speak_text(spanish_translation)
-                        print(f"✅ Complete!")
-                    print(f"{'='*70}\n")
+                        print(f"✅ TTS completed")
+                    print(f"{'='*60}")
                 
             except KeyboardInterrupt:
                 break
@@ -640,23 +304,16 @@ class SpanishEnglishTranslator:
         """Start the translator"""
         self.is_running = True
         
-        print("\n" + "="*70)
-        print("🇪🇸 ↔️ 🇬🇧 SPANISH-ENGLISH LIVE TRANSLATOR WITH REAL-TIME DISPLAY")
-        print("="*70)
-        print("\n✨ Features:")
-        print("  • Live audio visualization with volume meter")
-        print("  • Real-time word detection as you speak")
-        print("  • Automatic language detection (Spanish/English)")
-        print("  • Bidirectional translation with TTS")
-        print("  • Auto-stops after 1.5s of silence")
-        print("  • English translations scroll on OLED display")
-        print("\n📊 Visual Indicators:")
-        print("  🔴 SPEAKING - Active speech detected")
-        print("  🟡 SILENCE  - Pause detected (counting down)")
-        print("  🟢 WAITING  - Ready for input")
-        print("\n💬 Live transcription updates every 2 seconds")
-        print("\nPress Ctrl+C to stop")
-        print("="*70 + "\n")
+        print("\n" + "="*60)
+        print("🇪🇸 ↔️ 🇬🇧 SPANISH-ENGLISH LIVE TRANSLATOR")
+        print("="*60)
+        print("\nHow it works:")
+        print("  • Automatically detects Spanish or English")
+        print("  • Spanish → English translation + TTS")
+        print("  • English → Spanish translation + TTS")
+        print("  • Automatic silence detection (stops after 1.5s)")
+        print("\nPress Ctrl+C to stop\n")
+        print("="*60 + "\n")
         
         try:
             self.listen_loop()

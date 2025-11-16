@@ -28,7 +28,7 @@ def listen_for_wake_words(jarvis, frame_duration=2):
         None if no wake word detected
     """
     text = jarvis.listen_continuous(frame_duration=frame_duration, language="en-US")
-    print(text)
+    
     if text:
         text_lower = text.lower()
         if "jeff" in text_lower:
@@ -40,8 +40,9 @@ def listen_for_wake_words(jarvis, frame_duration=2):
 
 def main():
     # Create JARVIS instance
+    print("="*60)
     print("🩺 JARVIS - Nursing Assistant")
-    print("="*6)
+    print("="*60)
     print("\nInitializing JARVIS...")
     print("(Loading system instructions from jarvis_instructions.txt)")
     jarvis = create_jarvis()
@@ -54,25 +55,24 @@ def main():
     print("\n📚 Loading clinical context...")
     try:
         # Recursively add all .txt files from output folder
-        # if os.path.exists("output"):
-        #     chunks = jarvis.add_context_from_directory("output", recursive=True)
-        #     if chunks > 0:
-        #         print(f"✅ Loaded clinical reports from output folder")
+        if os.path.exists("output"):
+            chunks = jarvis.add_context_from_directory("output", recursive=True)
+            if chunks > 0:
+                print(f"✅ Loaded clinical reports from output folder")
         
-        # # Add knowledge base if it exists
-        # if os.path.exists("jarvis_kb.txt"):
-        #     jarvis.add_context_from_file("jarvis_kb.txt")
-        #     print(f"✅ Loaded knowledge base")
-        pass
+        # Add knowledge base if it exists
+        if os.path.exists("jarvis_kb.txt"):
+            jarvis.add_context_from_file("jarvis_kb.txt")
+            print(f"✅ Loaded knowledge base")
     except Exception as e:
         print(f"⚠️ Warning loading context: {e}")
     
     # Initialize translator
     translator = SpanishEnglishTranslator()
     
-    print("\n" + "="*6)
+    print("\n" + "="*60)
     print("🎙️  JARVIS Nursing Assistant - Voice Interface")
-    print("="*6)
+    print("="*60)
     print("\n✨ Wake Words:")
     print("   • Say 'JEFF' → Activate JARVIS nursing assistant")
     print("   • Say 'TRANSLATE' → Activate Spanish-English translator")
@@ -83,7 +83,7 @@ def main():
     print("   - Translator: Real-time Spanish ↔ English")
     print("   - Press Ctrl+C to exit")
     print("\n⚙️  Status: Ready - listening for wake words")
-    print("="*6 + "\n")
+    print("="*60 + "\n")
     
     frame_count = 0
     try:
@@ -130,7 +130,7 @@ def main():
                 print("   • 'stop translating' or 'end translating'")
                 print("   • 'stop translation' or 'end translation'")
                 print("   • Or press Ctrl+C\n")
-                print("="*6 + "\n")
+                print("="*60 + "\n")
                 
                 # Enter continuous translator mode
                 translator.is_running = True
@@ -173,7 +173,7 @@ def main():
                         
                         if language == "spanish":
                             # Spanish → English
-                            print(f"\n{'='*6}")
+                            print(f"\n{'='*60}")
                             print(f"[{timestamp_str}] 🇪🇸 SPANISH DETECTED:")
                             print(f"  {text}")
                             print(f"  (Whisper detected: {detected_lang})")
@@ -186,10 +186,10 @@ def main():
                                 print(f"\n🔊 Speaking in English...")
                                 translator.speak_text(english_translation)
                                 print("✅ TTS completed")
-                            print(f"{'='*6}\n")
+                            print(f"{'='*60}\n")
                         else:  # English
                             # English → Spanish
-                            print(f"\n{'='*6}")
+                            print(f"\n{'='*60}")
                             print(f"[{timestamp_str}] 🇬🇧 ENGLISH DETECTED:")
                             print(f"  {text}")
                             print(f"  (Whisper detected: {detected_lang})")
@@ -202,7 +202,7 @@ def main():
                                 print(f"\n🔊 Speaking in Spanish...")
                                 translator.speak_text(spanish_translation)
                                 print("✅ TTS completed")
-                            print(f"{'='*6}\n")
+                            print(f"{'='*60}\n")
                         
                         print("🟢 Ready for next input...\n")
                 
@@ -213,7 +213,7 @@ def main():
                 
                 translator.is_running = False
                 print("\n🔙 Returning to wake word detection...\n")
-                print("="*6 + "\n")
+                print("="*60 + "\n")
                 frame_count = 0  # Reset frame counter after translator
     
     except KeyboardInterrupt:
@@ -222,15 +222,15 @@ def main():
         translator.is_running = False
 
 if __name__ == "__main__":
-    # # Start detect in a separate thread
-    # detect_thread = threading.Thread(target=detect.main, daemon=True)
-    # detect_thread.start()
+    # Start detect in a separate thread
+    detect_thread = threading.Thread(target=detect.main, daemon=True)
+    detect_thread.start()
     
-    # print("🎥 Detection system started in background thread")
-    # print("   (Initializing webcam and audio monitoring...)\n")
+    print("🎥 Detection system started in background thread")
+    print("   (Initializing webcam and audio monitoring...)\n")
     
-    # # Give detect thread time to initialize
-    # time.sleep(2)
+    # Give detect thread time to initialize
+    time.sleep(2)
     
     try:
         main()
