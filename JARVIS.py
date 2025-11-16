@@ -6,7 +6,6 @@ Can be imported and used in any Python project
 import os
 import pathlib
 import uuid
-from typing import Optional, List, Dict, Any
 from dotenv import load_dotenv, find_dotenv
 from openai import OpenAI
 import chromadb
@@ -106,13 +105,13 @@ class JARVIS:
     
     def __init__(
         self,
-        api_key: Optional[str] = None,
-        model: str = "gpt-5-nano",
-        embedding_model: str = "text-embedding-3-small",
-        db_path: Optional[str] = None,
-        disable_telemetry: bool = True,
-        tts_voice: str = "alloy",
-        tts_model: str = "tts-1-hd"
+        api_key=None,
+        model="gpt-5-nano",
+        embedding_model="text-embedding-3-small",
+        db_path=None,
+        disable_telemetry=True,
+        tts_voice="alloy",
+        tts_model="tts-1-hd"
     ):
 
         if disable_telemetry:
@@ -163,25 +162,22 @@ class JARVIS:
         
         print(f"JARVIS initialized with collection: {self.collection_name}")
     
-    def _load_instructions(self) -> str:
-        instructions_file = pathlib.Path("jarvis_instructions.txt")
-        
-        if instructions_file.exists():
+    def _load_instructions(self):
+        if pathlib.Path("jarvis_instructions.txt").exists():
             try:
-                instructions = instructions_file.read_text(encoding="utf-8")
                 print("Loaded system instructions")
-                return instructions
+                return pathlib.Path("jarvis_instructions.txt").read_text(encoding="utf-8")
             except Exception as e:
                 print(f"Could not load instructions: {e}")
         
         return """You are JARVIS, an intelligent AI assistant. 
 Be helpful, accurate, and concise. Use provided context when available."""
     
-    def set_silence_threshold(self, threshold: float) -> None:
+    def set_silence_threshold(self, threshold):
         self.silence_threshold = threshold
         print(f"JARVIS silence threshold set to: {threshold:.0f}")
     
-    def reload_instructions(self, instructions_path: Optional[str] = None) -> bool:
+    def reload_instructions(self, instructions_path=None):
         if instructions_path:
             instructions_file = pathlib.Path(instructions_path)
         else:
@@ -199,42 +195,38 @@ Be helpful, accurate, and concise. Use provided context when available."""
             print(f"Error reloading instructions: {e}")
             return False
     
-    def _embed_documents(self, texts: List[str]) -> List[List[float]]:
-        res = self.client.embeddings.create(
+    def _embed_documents(self, texts):
+        return [d.embedding for d in self.client.embeddings.create(
             model=self.embedding_model,
             input=texts
-        )
-        return [d.embedding for d in res.data]
+        ).data]
     
-    def _embed_query(self, text: str) -> List[float]:
-        res = self.client.embeddings.create(
+    def _embed_query(self, text):
+        return self.client.embeddings.create(
             model=self.embedding_model,
             input=[text]
-        )
-        return res.data[0].embedding
+        ).data[0].embedding
     
-    def _extract_text_from_file(self, filepath: pathlib.Path) -> str:
-        text = ""
-        
+    def _extract_text_from_file(self, filepath):
         if filepath.suffix.lower() == ".txt":
-            text = filepath.read_text(encoding="utf-8", errors="ignore")
+            return filepath.read_text(encoding="utf-8", errors="ignore").strip()
         elif filepath.suffix.lower() == ".pdf":
             try:
                 reader = PyPDF2.PdfReader(str(filepath))
-                text = "\n".join(
+                return "\n".join(
                     page.extract_text() or "" for page in reader.pages
-                )
+                ).strip()
             except Exception as e:
                 print(f"⚠️ Could not read {filepath.name}: {e}")
         
-        return text.strip()
+        return ""
     
     def add_context_from_file(
         self,
-        filepath: str,
-        chunk_size: int = 2000,
-        chunk_overlap: int = 200
-    ) -> int:
+        filepath,
+        chunk_size=2000,
+        chunk_overlap=200
+    ):
         filepath = pathlib.Path(filepath)
         
         if not filepath.exists():
@@ -273,11 +265,11 @@ Be helpful, accurate, and concise. Use provided context when available."""
     
     def add_context_from_directory(
         self,
-        directory: str,
-        chunk_size: int = 2000,
-        chunk_overlap: int = 200,
-        recursive: bool = False
-    ) -> int:
+        directory,
+        chunk_size=2000,
+        chunk_overlap=200,
+        recursive=False
+    ):
         directory = pathlib.Path(directory)
         
         if not directory.exists():
@@ -310,10 +302,10 @@ Be helpful, accurate, and concise. Use provided context when available."""
     
     def add_context_from_text(
         self,
-        text: str,
-        chunk_size: int = 2000,
-        chunk_overlap: int = 200
-    ) -> int:
+        text,
+        chunk_size=2000,
+        chunk_overlap=200
+    ):
         if not text.strip():
             return 0
         
@@ -344,29 +336,26 @@ Be helpful, accurate, and concise. Use provided context when available."""
     
     def _retrieve_relevant_context(
         self,
-        query: str,
-        n_results: int = 5
-    ) -> List[str]:
+        query,
+        n_results=5
+    ):
         try:
-            qvec = self._embed_query(query)
-            results = self.collection.query(
-                query_embeddings=[qvec],
+            return self.collection.query(
+                query_embeddings=[self._embed_query(query)],
                 n_results=n_results
-            )
-            docs = results.get("documents", [[]])[0]
-            return docs
+            ).get("documents", [[]])[0]
         except Exception as e:
             print(f"Error retrieving context: {e}")
             return []
     
     def ask(
         self,
-        query: str,
-        use_rag: bool = True,
-        n_results: int = 5,
-        include_sources: bool = False,
-        system_prompt: Optional[str] = None
-    ) -> str:
+        query,
+        use_rag=True,
+        n_results=5,
+        include_sources=False,
+        system_prompt=None
+    ):
         context_parts = []
         sources = []
         
@@ -377,26 +366,21 @@ Be helpful, accurate, and concise. Use provided context when available."""
                 context_parts.extend(relevant_docs)
                 sources = ["Vector Database"] * len(relevant_docs)
         
-        if system_prompt is None:
-            system_prompt = self.system_instructions
-        
-        messages = [{"role": "system", "content": system_prompt}]
+        messages = [{"role": "system", "content": system_prompt or self.system_instructions}]
         
         if context_parts:
-            context_message = "\n\n".join(context_parts)
             messages.append({
                 "role": "user",
-                "content": f"Context:\n{context_message}\n\nQuestion: {query}"
+                "content": f"Context:\n{'\n\n'.join(context_parts)}\n\nQuestion: {query}"
             })
         else:
             messages.append({"role": "user", "content": query})
         
         try:
-            response = self.client.chat.completions.create(
+            answer = self.client.chat.completions.create(
                 model=self.model,
                 messages=messages,
-            )
-            answer = response.choices[0].message.content
+            ).choices[0].message.content
             
             if include_sources and sources:
                 answer += f"\n\n[Sources: {', '.join(set(sources))}]"
@@ -408,42 +392,34 @@ Be helpful, accurate, and concise. Use provided context when available."""
     
     def chat(
         self,
-        messages: List[Dict[str, str]],
-        use_context: bool = True,
-        n_results: int = 3
-    ) -> str:
+        messages,
+        use_context=True,
+        n_results=3
+    ):
         if not messages:
             return "No messages provided."
         
         if use_context and self.context_chunks:
-            last_message = messages[-1]["content"]
-            relevant_docs = self._retrieve_relevant_context(
-                last_message,
-                n_results
-            )
-            
+            relevant_docs = self._retrieve_relevant_context(messages[-1]["content"], n_results)
             if relevant_docs:
-                context_msg = "Relevant context:\n" + "\n\n".join(relevant_docs)
-                messages.insert(-1, {"role": "system", "content": context_msg})
+                messages.insert(-1, {"role": "system", "content": "Relevant context:\n" + "\n\n".join(relevant_docs)})
         
         try:
-            response = self.client.chat.completions.create(
+            return self.client.chat.completions.create(
                 model=self.model,
                 messages=messages,
-            )
-            return response.choices[0].message.content
+            ).choices[0].message.content
         
         except Exception as e:
             return f"Error in conversation: {e}"
     
     def setup_microphone(
         self,
-        device_name_prefix: Optional[str] = None,
-        auto_select: bool = True
-    ) -> bool:
+        device_name_prefix=None,
+        auto_select=True
+    ):
         try:
-            devices = sd.query_devices()
-            input_devices = [(i, d) for i, d in enumerate(devices) if d['max_input_channels'] > 0]
+            input_devices = [(i, d) for i, d in enumerate(sd.query_devices()) if d['max_input_channels'] > 0]
             
             if not input_devices:
                 print("No input devices detected!")
@@ -460,8 +436,8 @@ Be helpful, accurate, and concise. Use provided context when available."""
                 print(f"No device found with prefix '{device_name_prefix}'")
             
             if auto_select:
-                self.mic_device_index = sd.default.device[0] 
-                self.mic_device = devices[self.mic_device_index]
+                self.mic_device_index = sd.default.device[0]
+                self.mic_device = sd.query_devices()[self.mic_device_index]
                 print(f"Using default microphone: {self.mic_device['name']}")
                 return True
             
@@ -471,43 +447,38 @@ Be helpful, accurate, and concise. Use provided context when available."""
             print(f"Error setting up microphone: {e}")
             return False
     
-    def list_microphones(self) -> List[Dict[str, Any]]:
+    def list_microphones(self):
         try:
-            devices = sd.query_devices()
-            input_devices = []
-            
-            for i, d in enumerate(devices):
-                if d['max_input_channels'] > 0:
-                    input_devices.append({
-                        'index': i,
-                        'name': d['name'],
-                        'sample_rate': d['default_samplerate'],
-                        'channels': d['max_input_channels']
-                    })
-            
-            return input_devices
-            
+            return [
+                {
+                    'index': i,
+                    'name': d['name'],
+                    'sample_rate': d['default_samplerate'],
+                    'channels': d['max_input_channels']
+                }
+                for i, d in enumerate(sd.query_devices())
+                if d['max_input_channels'] > 0
+            ]
         except Exception as e:
             print(f"Error listing microphones: {e}")
             return []
     
     def listen_continuous(
         self,
-        frame_duration: int = 2,
-        language: str = "en-US"
-    ) -> Optional[str]:
+        frame_duration=2,
+        language="en-US"
+    ):
         if self.mic_device_index is None:
             if not self.setup_microphone(device_name_prefix="PCM", auto_select=True):
                 return None
         
         try:
             sample_rate = int(self.mic_device['default_samplerate'])
-            channels = 1
             
             audio_data = sd.rec(
                 int(frame_duration * sample_rate),
                 samplerate=sample_rate,
-                channels=channels,
+                channels=1,
                 dtype='int16',
                 device=self.mic_device_index
             )
@@ -518,7 +489,7 @@ Be helpful, accurate, and concise. Use provided context when available."""
             
             wav_io = io.BytesIO()
             with wave.open(wav_io, 'wb') as wav_file:
-                wav_file.setnchannels(channels)
+                wav_file.setnchannels(1)
                 wav_file.setsampwidth(2) 
                 wav_file.setframerate(sample_rate)
                 wav_file.writeframes(audio_data.tobytes())
@@ -548,12 +519,12 @@ Be helpful, accurate, and concise. Use provided context when available."""
     
     def listen_with_silence_detection(
         self,
-        max_duration: int = 30,
-        silence_threshold: Optional[int] = None,
-        silence_duration: float = 1.5,
-        language: str = "en-US",
-        auto_calibrate: bool = False
-    ) -> Optional[str]:
+        max_duration=30,
+        silence_threshold=None,
+        silence_duration=1.5,
+        language="en-US",
+        auto_calibrate=False
+    ):
         if self.mic_device_index is None:
             print("Setting up microphone...")
             if not self.setup_microphone(device_name_prefix="PCM", auto_select=True):
@@ -562,8 +533,6 @@ Be helpful, accurate, and concise. Use provided context when available."""
         
         try:
             sample_rate = int(self.mic_device['default_samplerate'])
-            channels = 1
-            chunk_duration = 0.5  
             if silence_threshold is None:
                 silence_threshold = self.silence_threshold
             
@@ -572,9 +541,9 @@ Be helpful, accurate, and concise. Use provided context when available."""
                 calibration_samples = []
                 for _ in range(4):
                     chunk_data = sd.rec(
-                        int(chunk_duration * sample_rate),
+                        int(0.5 * sample_rate),
                         samplerate=sample_rate,
-                        channels=channels,
+                        channels=1,
                         dtype='int16',
                         device=self.mic_device_index
                     )
@@ -604,16 +573,16 @@ Be helpful, accurate, and concise. Use provided context when available."""
             
             while total_time < max_duration:
                 chunk_data = sd.rec(
-                    int(chunk_duration * sample_rate),
+                    int(0.5 * sample_rate),
                     samplerate=sample_rate,
-                    channels=channels,
+                    channels=1,
                     dtype='int16',
                     device=self.mic_device_index
                 )
                 sd.wait()  
                 
                 all_audio_chunks.append(chunk_data.copy())
-                total_time += chunk_duration
+                total_time += 0.5
                 
                 energy = np.abs(chunk_data).mean()
                 
@@ -623,7 +592,7 @@ Be helpful, accurate, and concise. Use provided context when available."""
                     print(".", end="", flush=True) 
                 else:
                     if has_speech:
-                        silence_time += chunk_duration
+                        silence_time += 0.5
                         print("_", end="", flush=True) 
                 if has_speech and silence_time >= silence_duration:
                     print("\nSilence detected, stopping...")
@@ -644,7 +613,7 @@ Be helpful, accurate, and concise. Use provided context when available."""
             
             wav_io = io.BytesIO()
             with wave.open(wav_io, 'wb') as wav_file:
-                wav_file.setnchannels(channels)
+                wav_file.setnchannels(1)
                 wav_file.setsampwidth(2)
                 wav_file.setframerate(sample_rate)
                 wav_file.writeframes(audio_data.tobytes())
@@ -684,10 +653,10 @@ Be helpful, accurate, and concise. Use provided context when available."""
     
     def listen(
         self,
-        duration: int = 5,
-        language: str = "en-US",
-        show_all: bool = False
-    ) -> Optional[str]:
+        duration=5,
+        language="en-US",
+        show_all=False
+    ):
         if self.mic_device_index is None:
             print("Setting up microphone...")
             if not self.setup_microphone(device_name_prefix="PCM", auto_select=True):
@@ -696,14 +665,13 @@ Be helpful, accurate, and concise. Use provided context when available."""
         
         try:
             sample_rate = int(self.mic_device['default_samplerate'])
-            channels = 1
             
             print(f"Recording for {duration} seconds... Speak now!")
             
             audio_data = sd.rec(
                 int(duration * sample_rate),
                 samplerate=sample_rate,
-                channels=channels,
+                channels=1,
                 dtype='int16',
                 device=self.mic_device_index
             )
@@ -713,7 +681,7 @@ Be helpful, accurate, and concise. Use provided context when available."""
             
             wav_io = io.BytesIO()
             with wave.open(wav_io, 'wb') as wav_file:
-                wav_file.setnchannels(channels)
+                wav_file.setnchannels(1)
                 wav_file.setsampwidth(2)
                 wav_file.setframerate(sample_rate)
                 wav_file.writeframes(audio_data.tobytes())
@@ -748,13 +716,11 @@ Be helpful, accurate, and concise. Use provided context when available."""
     
     def speak(
     self, 
-    text: str, 
-    voice: Optional[str] = None, 
-    save_to: Optional[str] = None
-    ) -> bool:
+    text, 
+    voice=None, 
+    save_to=None
+    ):
         try:
-            voice = voice or self.tts_voice
-
             anim_thread = threading.Thread(
                 target=oled_speaking_animation,
                 args=(max(2.0, len(text) * 0.15),),
@@ -764,7 +730,7 @@ Be helpful, accurate, and concise. Use provided context when available."""
 
             response = self.client.audio.speech.create(
                 model=self.tts_model,
-                voice=voice,
+                voice=voice or self.tts_voice,
                 input=text
             )
 
@@ -772,14 +738,11 @@ Be helpful, accurate, and concise. Use provided context when available."""
                 audio_path = save_to
                 with open(audio_path, 'wb') as audio_file:
                     audio_file.write(response.content)
-                should_delete = False
             else:
                 with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as temp_audio:
                     temp_audio.write(response.content)
                     audio_path = temp_audio.name
-                should_delete = True
 
-            played = False
             for cmd in [
                 ["mpv", "--really-quiet", audio_path],
                 ["ffplay", "-nodisp", "-autoexit", "-loglevel", "quiet", audio_path],
@@ -787,17 +750,17 @@ Be helpful, accurate, and concise. Use provided context when available."""
             ]:
                 try:
                     subprocess.run(cmd, check=True, capture_output=True)
-                    played = True
-                    break
+                    anim_thread.join(timeout=0.1)
+                    if not save_to:
+                        os.remove(audio_path)
+                    return True
                 except:
                     pass
 
             anim_thread.join(timeout=0.1)
-
-            if should_delete:
+            if not save_to:
                 os.remove(audio_path)
-
-            return played
+            return False
 
         except Exception as e:
             print(f"Error speaking: {e}")
@@ -805,16 +768,16 @@ Be helpful, accurate, and concise. Use provided context when available."""
 
     def listen_and_ask(
         self,
-        duration: int = 5,
-        language: str = "en-US",
-        use_rag: bool = True,
-        n_results: int = 5,
-        auto_stop: bool = True,
-        max_duration: int = 30,
-        silence_duration: float = 1.5,
-        speak_response: bool = False,
-        save_audio_to: Optional[str] = None
-    ) -> Optional[str]:
+        duration=5,
+        language="en-US",
+        use_rag=True,
+        n_results=5,
+        auto_stop=True,
+        max_duration=30,
+        silence_duration=1.5,
+        speak_response=False,
+        save_audio_to=None
+    ):
         if auto_stop:
             query = self.listen_with_silence_detection(
                 max_duration=max_duration,
@@ -854,7 +817,7 @@ Be helpful, accurate, and concise. Use provided context when available."""
         
         print("🧹 Context cleared. New collection created.")
     
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self):
         return {
             "total_chunks": len(self.context_chunks),
             "collection_name": self.collection_name,
@@ -863,5 +826,5 @@ Be helpful, accurate, and concise. Use provided context when available."""
             "context_size_chars": len(self.large_context)
         }
 
-def create_jarvis(**kwargs) -> JARVIS:
+def create_jarvis(**kwargs):
     return JARVIS(**kwargs)

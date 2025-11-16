@@ -227,7 +227,7 @@ def realtime_routing_alert(result):
         oled_print("SECURITY DISPATCHED:")
         for unit, eta in security_units.items():
             oled_print(f"    {unit}  ETA {eta}")
-        print("--------------------------------------------------")
+        print("SECURITY DISPATCHED:")
         return
 
     if routing == "emergency":
@@ -236,32 +236,32 @@ def realtime_routing_alert(result):
             oled_print(f"       - {unit}  ETA {eta}")
         name, eta = doctors_available["emergency"]
         oled_print(f"    Paging ER Doctor: {name}  ETA {eta} minutes")
-        print("--------------------------------------------------")
+        print("Paging ER Doctor")
         return
 
     if routing == "doctor":
         name, eta = doctors_available["general"]
         oled_print(f"DOCTOR PAGED:\n{name}  ETA {eta} minutes\nIssue: {issue}")
-        print("--------------------------------------------------")
+        print("Paging General Doctor")
         return
 
     if routing == "allergy":
         name, eta = doctors_available["allergy"]
         oled_print(f"ALLERGY SPECIALIST PAGED:\n{name}  ETA {eta} minutes\nTrigger: {issue}")
-        print("--------------------------------------------------")
+        print("Paging Allergy Specialist")
         return
 
     if routing == "injury":
         name, eta = doctors_available["injury"]
         oled_print(f"TRAUMA/INJURY PHYSICIAN PAGED:\n{name}  ETA {eta} minutes\nIssue: {issue}")
-        print("--------------------------------------------------")
+        print("Paging Trauma/Injury Physician")
         return
 
     if routing == "none":
         dynamic = generate_dynamic_vitals()
 
         oled_print(f"Heart Rate: {dynamic['heart_rate']}\nBlood Pressure: {dynamic['blood_pressure']}\nOxygen Level: {dynamic['oxygen']}\nRespiration: {dynamic['respiration']}\nTemperature: {dynamic['temperature']}")
-        print("--------------------------------------------------")
+        print("No issues detected")
         return
 
 def extract_json(text):
@@ -320,46 +320,46 @@ def analyze_frame(frame):
     audio_text = "\n".join(audio_context[-3:]) or "No audio context"
 
     system_prompt = f"""
-You are a realtime multimodal safety monitoring AI.
+        You are a realtime multimodal safety monitoring AI.
 
-VITAL SIGNS:
-{vital_signs}
+        VITAL SIGNS:
+        {vital_signs}
 
-DOCTORS AVAILABLE:
-{doctors_available}
+        DOCTORS AVAILABLE:
+        {doctors_available}
 
-SECURITY UNITS:
-{security_units}
+        SECURITY UNITS:
+        {security_units}
 
-Recent Visual Context:
-{visual_text}
+        Recent Visual Context:
+        {visual_text}
 
-Recent Audio Context:
-{audio_text}
+        Recent Audio Context:
+        {audio_text}
 
-TASKS:
-1. Detect aggression:
-   - yelling, shouting, 'stop', 'help'
-   - clenched fists, rapid movement, hitting objects
+        TASKS:
+        1. Detect aggression:
+        - yelling, shouting, 'stop', 'help'
+        - clenched fists, rapid movement, hitting objects
 
-2. Detect medical anomalies:
-   - “I can’t breathe”, “it hurts”, “help me”
-   - allergies, peanuts in view
-   - fainting, sweating, pale face
-   - blood or injury
+        2. Detect medical anomalies:
+        - “I can’t breathe”, “it hurts”, “help me”
+        - allergies, peanuts in view
+        - fainting, sweating, pale face
+        - blood or injury
 
-3. Provide routing:
-   security | doctor | allergy | injury | emergency | none
+        3. Provide routing:
+        security | doctor | allergy | injury | emergency | none
 
-STRICT JSON ONLY:
-{{
-  "description": "summary",
-  "aggression": true/false,
-  "aggression_level": 0-10,
-  "medical": true/false,
-  "medical_issue": "string or null",
-  "routing": "security | doctor | allergy | injury | emergency | none"
-}}
+        STRICT JSON ONLY:
+        {{
+        "description": "summary",
+        "aggression": true/false,
+        "aggression_level": 0-10,
+        "medical": true/false,
+        "medical_issue": "string or null",
+        "routing": "security | doctor | allergy | injury | emergency | none"
+        }}
     """
 
     response = client.chat.completions.create(
@@ -430,30 +430,30 @@ def generate_report(events, audio_transcript):
     history = json.dumps(events, indent=2)
 
     prompt = f"""
-VITAL SIGNS:
-{vital_signs}
+        VITAL SIGNS:
+        {vital_signs}
 
-DOCTORS:
-{doctors_available}
+        DOCTORS:
+        {doctors_available}
 
-SECURITY UNITS:
-{security_units}
+        SECURITY UNITS:
+        {security_units}
 
-EVENT JSON (visual + audio):
-{history}
+        EVENT JSON (visual + audio):
+        {history}
 
-AUDIO TRANSCRIPT:
-{audio_transcript}
+        AUDIO TRANSCRIPT:
+        {audio_transcript}
 
-Write a full incident report including:
-- Summary
-- Patient condition
-- Aggression analysis
-- Medical findings
-- Routing decisions and who is called
-- Timeline
-- Recommended actions
-"""
+        Write a full incident report including:
+        - Summary
+        - Patient condition
+        - Aggression analysis
+        - Medical findings
+        - Routing decisions and who is called
+        - Timeline
+        - Recommended actions
+    """
     response = client.chat.completions.create(
         model="gpt-4o",
         messages=[
