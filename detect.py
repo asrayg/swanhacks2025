@@ -287,16 +287,14 @@ def realtime_routing_alert(result):
     if routing == "none":
         dynamic = generate_dynamic_vitals()
 
-        print("✅ No routing required at this moment.")
-        oled_print("    Vitals stable (auto-monitoring active)")
-        oled_print(f"   Heart Rate:       {dynamic['heart_rate']}")
-        oled_print(f"   Blood Pressure:   {dynamic['blood_pressure']}")
-        oled_print(f"   Oxygen Level:     {dynamic['oxygen']}")
-        oled_print(f"   Respiration:      {dynamic['respiration']}")
-        oled_print(f"   Temperature:      {dynamic['temperature']}")
-        oled_print("   No aggression detected.")
-        oled_print("   No medical issues detected.")
-        oled_print("   Continuing normal monitoring...")
+        oled_print(f"""
+        Heart Rate:       {dynamic['heart_rate']}
+        Blood Pressure:   {dynamic['blood_pressure']}
+        Oxygen Level:     {dynamic['oxygen']}
+        Respiration:      {dynamic['respiration']}
+        Temperature:      {dynamic['temperature']}
+        No aggression detected.
+        No medical issues detected.""")
         print("--------------------------------------------------")
         return
 
