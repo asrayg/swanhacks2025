@@ -92,7 +92,7 @@ class AudioRecorder:
 
         self.thread = threading.Thread(target=record)
         self.thread.start()
-        print("🎤 Audio recording started (continuous)")
+        print("Audio recording started (continuous)")
 
     def stop_and_save_full_audio(self, filename):
         self.is_recording = False
@@ -108,7 +108,7 @@ class AudioRecorder:
         wf.close()
 
         self.audio.terminate()
-        print(f"🎤 Full session audio saved to: {filename}")
+        print(f"Full session audio saved to: {filename}")
 
     def save_chunk(self, chunk_filename):
         num_frames = int(5 * RATE / CHUNK)
@@ -148,14 +148,14 @@ def generate_dynamic_vitals():
     dia = random.randint(70, 90)   # Diastolic BP
     oxy = random.randint(94, 100)  # %
     resp = random.randint(12, 20)  # breaths per minute
-    temp = round(random.uniform(97.5, 99.2), 1)  # °F
+    temp = round(random.uniform(97.5, 99.2), 1)  # F
 
     return {
         "heart_rate": f"{hr} bpm",
         "blood_pressure": f"{sys}/{dia} mmHg",
         "oxygen": f"{oxy}%",
         "respiration": f"{resp} breaths/min",
-        "temperature": f"{temp}°F"
+        "temperature": f"{temp}F"
     }
 
 
@@ -167,62 +167,47 @@ def realtime_routing_alert(result):
 
 
     # ---------------------------------------------------------
-    # 🚨 SECURITY RESPONSE
+    # SECURITY RESPONSE
     # ---------------------------------------------------------
     if routing == "security":
-        oled_print(oled, "SECURITY 🚨")
+        oled_print(oled, "SECURITY")
         for unit, eta in security_units.items():
-            oled_print(oled,f"   • {unit} → ETA {eta}")
+            oled_print(oled,f"   - {unit} -> ETA {eta}")
         return
 
     if routing == "emergency":
-        oled_print(oled,"🚑 EMERGENCY RESPONSE ACTIVATED:")
-        oled_print(oled,"   • Notifying all security units:")
+        oled_print(oled,"Emergency Response Activated:\n   Notifying all security units:")
         for unit, eta in security_units.items():
-            oled_print(oled,f"       - {unit} → ETA {eta}")
+            oled_print(oled,f"       - {unit} -> ETA {eta}")
         name, eta = doctors_available["emergency"]
-        oled_print(oled,f"   • Paging ER Doctor: {name} → ETA {eta} minutes")
+        oled_print(oled,f"   - Paging ER Doctor: {name} -> ETA {eta} minutes")
         return
 
     # ---------------------------------------------------------
-    # 🩺 MEDICAL ROUTES
+    # MEDICAL ROUTES
     # ---------------------------------------------------------
     if routing == "doctor":
         name, eta = doctors_available["general"]
-        oled_print(oled,"👨‍⚕️ DOCTOR PAGED:")
-        oled_print(oled,f"   • {name} → ETA {eta} minutes")
-        oled_print(oled,f"   • Issue: {issue}")
+        oled_print(oled,f"DOCTOR PAGED:\n   - {name} -> ETA {eta} minutes\n   - Issue: {issue}")
         return
 
     if routing == "allergy":
         name, eta = doctors_available["allergy"]
-        oled_print(oled,"🌰 ALLERGY SPECIALIST PAGED:")
-        oled_print(oled,f"   • {name} → ETA {eta} minutes")
-        oled_print(oled,f"   • Trigger: {issue}")
+        oled_print(oled,f"ALLERGY SPECIALIST PAGED:\n   - {name} -> ETA {eta} minutes\n   - Trigger: {issue}")
         return
 
     if routing == "injury":
         name, eta = doctors_available["injury"]
-        oled_print(oled,"🩹 TRAUMA/INJURY PHYSICIAN PAGED:")
-        oled_print(oled,f"   • {name} → ETA {eta} minutes")
-        oled_print(oled,f"   • Issue: {issue}")
+        oled_print(oled,f"TRAUMA/INJURY PHYSICIAN PAGED:\n   - {name} -> ETA {eta} minutes\n   - Issue: {issue}")
         return
 
     # ---------------------------------------------------------
-    # NOTHING HAPPENING → STILL PRINT USEFUL STATUS
+    # NOTHING HAPPENING - STILL PRINT USEFUL STATUS
     # ---------------------------------------------------------
     if routing == "none":
         dynamic = generate_dynamic_vitals()
 
-        oled_print(oled,"   • Vitals stable (auto-monitoring active)")
-        oled_print(oled,f"   • Heart Rate:       {dynamic['heart_rate']}")
-        oled_print(oled,f"   • Blood Pressure:   {dynamic['blood_pressure']}")
-        oled_print(oled,f"   • Oxygen Level:     {dynamic['oxygen']}")
-        oled_print(oled,f"   • Respiration:      {dynamic['respiration']}")
-        oled_print(oled,f"   • Temperature:      {dynamic['temperature']}")
-        oled_print(oled,"   • No aggression detected.")
-        oled_print(oled,"   • No medical issues detected.")
-        oled_print(oled,"   • Continuing normal monitoring...")
+        oled_print(oled,f"   - Vitals stable (auto-monitoring active)\n   - Heart Rate:       {dynamic['heart_rate']}\n   - Blood Pressure:   {dynamic['blood_pressure']}\n   - Oxygen Level:     {dynamic['oxygen']}\n   - Respiration:      {dynamic['respiration']}\n   - Temperature:      {dynamic['temperature']}\n   - No aggression detected.\n   - No medical issues detected.\n   - Continuing normal monitoring...")
         return
 
 # -----------------------------
@@ -352,7 +337,7 @@ STRICT JSON ONLY:
     result = extract_json(raw)
 
     if result is None:
-        print("⚠️ GPT returned non-JSON:", raw)
+        print("Warning: GPT returned non-JSON:", raw)
         return {
             "description": "json_error",
             "aggression": False,
@@ -373,10 +358,10 @@ STRICT JSON ONLY:
             result["routing"] = "emergency" if "breathe" in last_audio else "doctor"
 
     # -----------------------------
-    # 🔥 NEW: HARD RULE ROUTING OVERRIDES
+    # NEW: HARD RULE ROUTING OVERRIDES
     # -----------------------------
 
-    # If aggression is detected but routing is missing → force security.
+    # If aggression is detected but routing is missing -> force security.
     if result["aggression"] and result["routing"] == "none":
         if result["aggression_level"] >= 7:
             result["routing"] = "emergency"
@@ -472,13 +457,13 @@ def save_output(report, audio_file, frames, session_folder):
     for i, frame in enumerate(frames):
         cv2.imwrite(os.path.join(session_folder, f"frame_{i:04d}.jpg"), frame)
 
-    print(f"📁 Saved all output → {session_folder}")
+    print(f"Saved all output -> {session_folder}")
     
     # Post to Supabase
     try:
         post_to_supabase(report_path, audio_path)
     except Exception as e:
-        print(f"⚠️ Error posting to Supabase: {e}")
+        print(f"Warning: Error posting to Supabase: {e}")
     
     return report_path
 
@@ -504,7 +489,7 @@ def post_to_supabase(report_path, audio_path):
         # Generate a unique ID (or let Supabase auto-generate)
         # We'll let Supabase auto-generate the ID by not providing it
         
-        print("📤 Posting to Supabase...")
+        print("Posting to Supabase...")
         
         # Insert into Expo table
         response = supabase.table("Expo").insert({
@@ -513,15 +498,15 @@ def post_to_supabase(report_path, audio_path):
         }).execute()
         
         if response.data:
-            print(f"✅ Successfully posted to Supabase!")
+            print(f"Successfully posted to Supabase!")
             print(f"   Record ID: {response.data[0].get('id', 'N/A')}")
             print(f"   Report length: {len(report_content)} characters")
             print(f"   Audio file: {abs_audio_path}")
         else:
-            print("⚠️ No data returned from Supabase insert")
+            print("Warning: No data returned from Supabase insert")
             
     except Exception as e:
-        print(f"❌ Error posting to Supabase: {e}")
+        print(f"Error posting to Supabase: {e}")
         raise
 
 def oled_print(oled, text):
@@ -541,7 +526,7 @@ def main():
     session_folder = f"output/session_{session_ts}"
     os.makedirs(session_folder, exist_ok=True)
 
-    print("📸 Using rpicam-still capture mode (no /dev/video0 required)")
+    print("Using rpicam-still capture mode (no /dev/video0 required)")
 
     audio_filename = f"audio_{session_ts}.wav"
 
@@ -564,7 +549,7 @@ def main():
             # -------------------------
             frame = capture_frame()
             if frame is None:
-                print("⚠️ Frame capture failed, retrying...")
+                print("Warning: Frame capture failed, retrying...")
                 continue
 
             frames_collected.append(frame.copy())
@@ -582,13 +567,13 @@ def main():
                     audio_context.append(text)
 
                     if detect_shutdown_command(text):
-                        oled_print(oled, "\n🛑 Voice shutdown command detected!")
-                        print("   → Ending session safely...\n")
+                        oled_print(oled, "\nVoice shutdown command detected!")
+                        print("   -> Ending session safely...\n")
                         break
 
                     issue = detect_audio_keywords(text)
                     if issue:
-                        print(f"🚨 AUDIO FLAG: {issue}")
+                        print(f"AUDIO FLAG: {issue}")
 
                 last_audio_time = now
 
@@ -612,22 +597,22 @@ def main():
             # Manual shutdown support
             key = cv2.waitKey(1) & 0xFF
             if key == ord("q") or key == ord("s"):
-                print("\n🛑 Manual shutdown triggered.")
+                print("\nManual shutdown triggered.")
                 break
 
     except KeyboardInterrupt:
         pass
 
-    print("\n🛑 Ending session...")
+    print("\nEnding session...")
 
     audio_rec.stop_and_save_full_audio(audio_filename)
 
-    print("🎤 Transcribing full session audio...")
+    print("Transcribing full session audio...")
     full_audio_text = transcribe_chunk(audio_filename)
 
-    print("📄 Generating final report...")
+    print("Generating final report...")
     report = generate_report(events, full_audio_text, session_date_str, session_time_str)
 
     save_output(report, audio_filename, frames_collected, session_folder)
 
-    print("\n✅ Session complete.")
+    print("\nSession complete.")

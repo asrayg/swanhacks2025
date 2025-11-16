@@ -12,6 +12,49 @@ import threading
 import sys
 import time
 import detect
+import sounddevice as sd
+import numpy as np
+
+
+def calibrate_noise_floor(sample_rate=16000, channels=1):
+    """
+    Calibrate the noise floor once at startup.
+    This ensures consistent thresholds across JARVIS and translator.
+    
+    Returns:
+        silence_threshold: The calibrated energy threshold
+    """
+    print("\n🔧 Calibrating noise floor...")
+    print("   (Please stay quiet for 2 seconds)")
+    
+    chunk_duration = 0.5  # 500ms chunks
+    calibration_samples = []
+    
+    try:
+        for _ in range(4):  # 4 chunks = 2 seconds
+            chunk_data = sd.rec(
+                int(chunk_duration * sample_rate),
+                samplerate=sample_rate,
+                channels=channels,
+                dtype='int16'
+            )
+            sd.wait()
+            energy = np.abs(chunk_data).mean()
+            calibration_samples.append(energy)
+        
+        # Set threshold as 2.5x the average background noise
+        avg_noise = np.mean(calibration_samples)
+        silence_threshold = avg_noise * 2.5
+        
+        print(f"✅ Noise floor: {avg_noise:.0f}")
+        print(f"✅ Speech threshold: {silence_threshold:.0f}\n")
+        
+        return silence_threshold
+        
+    except Exception as e:
+        print(f"⚠️  Error during calibration: {e}")
+        print("   Using default threshold of 10000\n")
+        return 10000
 
 
 def listen_for_wake_words(jarvis, frame_duration=2):
@@ -51,8 +94,14 @@ def main():
     print("\n🔧 Setting up microphone...")
     jarvis.setup_microphone(device_name_prefix="PCM", auto_select=True)
     
+    # Calibrate noise floor once for all components
+    silence_threshold = calibrate_noise_floor()
+    
+    # Set the calibrated threshold in JARVIS
+    jarvis.set_silence_threshold(silence_threshold)
+    
     # Load context from output folder and knowledge base
-    print("\n📚 Loading clinical context...")
+    print("📚 Loading clinical context...")
     try:
         # Recursively add all .txt files from output folder
         if os.path.exists("output"):
@@ -67,8 +116,8 @@ def main():
     except Exception as e:
         print(f"⚠️ Warning loading context: {e}")
     
-    # Initialize translator
-    translator = SpanishEnglishTranslator()
+    # Initialize translator with calibrated threshold
+    translator = SpanishEnglishTranslator(silence_threshold=silence_threshold)
     
     print("\n" + "="*60)
     print("🎙️  JARVIS Nursing Assistant - Voice Interface")

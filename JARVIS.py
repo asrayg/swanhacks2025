@@ -110,6 +110,7 @@ class JARVIS:
         self.recognizer = sr.Recognizer()
         self.mic_device_index = None
         self.mic_device = None
+        self.silence_threshold = 3000  # Default threshold, can be set via set_silence_threshold()
         
         # Text-to-speech settings
         self.tts_voice = tts_voice  # Options: alloy, echo, fable, onyx, nova, shimmer
@@ -135,6 +136,17 @@ class JARVIS:
         # Default instructions if file doesn't exist
         return """You are JARVIS, an intelligent AI assistant. 
 Be helpful, accurate, and concise. Use provided context when available."""
+    
+    def set_silence_threshold(self, threshold: float) -> None:
+        """
+        Set the silence threshold for voice detection.
+        This should be called after calibrating the noise floor.
+        
+        Args:
+            threshold: Energy threshold below which is considered silence
+        """
+        self.silence_threshold = threshold
+        print(f"✅ JARVIS silence threshold set to: {threshold:.0f}")
     
     def reload_instructions(self, instructions_path: Optional[str] = None) -> bool:
         """
@@ -628,10 +640,10 @@ Be helpful, accurate, and concise. Use provided context when available."""
     def listen_with_silence_detection(
         self,
         max_duration: int = 30,
-        silence_threshold: int = 15000,
+        silence_threshold: Optional[int] = None,
         silence_duration: float = 1.5,
         language: str = "en-US",
-        auto_calibrate: bool = True
+        auto_calibrate: bool = False
     ) -> Optional[str]:
         """
         Listen to microphone and automatically stop when user stops talking.
@@ -639,10 +651,10 @@ Be helpful, accurate, and concise. Use provided context when available."""
         
         Args:
             max_duration: Maximum recording duration in seconds
-            silence_threshold: Energy threshold below which is considered silence (ignored if auto_calibrate=True)
+            silence_threshold: Energy threshold below which is considered silence (uses instance variable if None)
             silence_duration: Seconds of silence before stopping
             language: Language code (e.g., 'en-US', 'es-ES')
-            auto_calibrate: Automatically calibrate noise floor (recommended for noisy environments)
+            auto_calibrate: Automatically calibrate noise floor (default False, done centrally in main)
         
         Returns:
             Transcribed text or None if recognition failed
@@ -659,7 +671,11 @@ Be helpful, accurate, and concise. Use provided context when available."""
             channels = 1
             chunk_duration = 0.5  # 500ms chunks (safer for virtual devices)
             
-            # Auto-calibrate noise floor
+            # Use provided threshold, or fall back to instance variable
+            if silence_threshold is None:
+                silence_threshold = self.silence_threshold
+            
+            # Auto-calibrate noise floor (only if explicitly requested)
             if auto_calibrate:
                 print("🔧 Calibrating noise floor... (stay quiet for 2 seconds)")
                 calibration_samples = []
@@ -677,7 +693,8 @@ Be helpful, accurate, and concise. Use provided context when available."""
                 
                 # Set threshold as 2.5x the average background noise
                 avg_noise = np.mean(calibration_samples)
-                silence_threshold = avg_noise 
+                silence_threshold = avg_noise * 2.5
+                self.silence_threshold = silence_threshold
                 print(f"✅ Noise floor: {avg_noise:.0f}, Speech threshold: {silence_threshold:.0f}")
             
             print(f"🎤 Listening... Speak now! (stops automatically when you finish)")
