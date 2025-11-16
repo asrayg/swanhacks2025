@@ -102,12 +102,12 @@ class AudioRecorder:
         self.stream.stop_stream()
         self.stream.close()
 
-        with open(filename, "wb") as f_out:
-            wf = wave.open(f_out, 'wb')
-            wf.setnchannels(1)
-            wf.setsampwidth(self.audio.get_sample_size(AUDIO_FORMAT))
-            wf.setframerate(44100)
-            wf.writeframes(b''.join(self.frames))
+        wf = wave.open(filename, "wb")
+        wf.setnchannels(1)
+        wf.setsampwidth(self.audio.get_sample_size(AUDIO_FORMAT))
+        wf.setframerate(44100)
+        wf.writeframes(b''.join(self.frames))
+        wf.close()
 
         self.audio.terminate()
 
@@ -120,12 +120,12 @@ class AudioRecorder:
             self.frames[-num_frames:] if len(self.frames) >= num_frames else self.frames
         )
 
-        with open(chunk_filename, "wb") as f_out:
-            wf = wave.open(f_out, "wb")
-            wf.setnchannels(1)
-            wf.setsampwidth(self.audio.get_sample_size(AUDIO_FORMAT))
-            wf.setframerate(44100)
-            wf.writeframes(b"".join(chunk_data))
+        wf = wave.open(chunk_filename, "wb")
+        wf.setnchannels(1)
+        wf.setsampwidth(self.audio.get_sample_size(AUDIO_FORMAT))
+        wf.setframerate(44100)
+        wf.writeframes(b"".join(chunk_data))
+        wf.close()
 
         return True
 
