@@ -13,16 +13,39 @@ load_dotenv()
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 class SpanishEnglishTranslator:
-    def __init__(self):
+    def __init__(self, auto_calibrate=True):
         self.is_running = False
         self.sample_rate = 16000
         self.channels = 1
         self.silence_threshold = 10000  # Energy threshold for silence
         self.silence_duration = 1.5  # Seconds of silence before stopping
+        self.auto_calibrate = auto_calibrate
+        self.calibrated = False
         
     def record_with_silence_detection(self, max_duration=30):
         """Record audio until silence is detected"""
         chunk_duration = 0.5  # 500ms chunks
+        
+        # Auto-calibrate noise floor on first use
+        if self.auto_calibrate and not self.calibrated:
+            print("🔧 Calibrating noise floor... (stay quiet for 2 seconds)", end="\r")
+            calibration_samples = []
+            for _ in range(4):  # 4 chunks = 2 seconds
+                chunk_data = sd.rec(
+                    int(chunk_duration * self.sample_rate),
+                    samplerate=self.sample_rate,
+                    channels=self.channels,
+                    dtype='int16'
+                )
+                sd.wait()
+                energy = np.abs(chunk_data).mean()
+                calibration_samples.append(energy)
+            
+            # Set threshold as 2.5x the average background noise
+            avg_noise = np.mean(calibration_samples)
+            self.silence_threshold = avg_noise * 2.5
+            self.calibrated = True
+            print(f"✅ Noise floor: {avg_noise:.0f}, Speech threshold: {self.silence_threshold:.0f}")
         
         print("🎤 Listening... Speak now!", end="\r")
         
