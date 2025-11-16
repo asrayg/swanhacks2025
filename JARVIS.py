@@ -131,7 +131,7 @@ class JARVIS:
     def __init__(
         self,
         api_key: Optional[str] = None,
-        model: str = "gpt-5.1-nano",
+        model: str = "gpt-5-nano",
         embedding_model: str = "text-embedding-3-small",
         temperature: float = 0.2,
         db_path: Optional[str] = None,
