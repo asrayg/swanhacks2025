@@ -677,16 +677,7 @@ Be helpful, accurate, and concise. Use provided context when available."""
             sample_rate = int(self.mic_device['default_samplerate'])
             channels = 1
             
-            # Start listening animation
-            stop_animation = threading.Event()
-            anim_thread = threading.Thread(
-                target=oled_listening_animation,
-                args=(stop_animation,),
-                daemon=True
-            )
-            anim_thread.start()
-            
-            # Record audio using sounddevice
+            # Record audio using sounddevice (NO animation for wake word detection)
             audio_data = sd.rec(
                 int(frame_duration * sample_rate),
                 samplerate=sample_rate,
@@ -695,10 +686,6 @@ Be helpful, accurate, and concise. Use provided context when available."""
                 device=self.mic_device_index
             )
             sd.wait()  # Wait until recording is finished
-            
-            # Stop listening animation
-            stop_animation.set()
-            anim_thread.join(timeout=0.1)
             
             # Debug: Check audio levels
             audio_max = np.abs(audio_data).max()
@@ -940,16 +927,7 @@ Be helpful, accurate, and concise. Use provided context when available."""
             
             print(f"🎤 Recording for {duration} seconds... Speak now!")
             
-            # Start listening animation
-            stop_animation = threading.Event()
-            anim_thread = threading.Thread(
-                target=oled_listening_animation,
-                args=(stop_animation,),
-                daemon=True
-            )
-            anim_thread.start()
-            
-            # Record audio using sounddevice
+            # Record audio using sounddevice (NO animation for simple listen)
             audio_data = sd.rec(
                 int(duration * sample_rate),
                 samplerate=sample_rate,
@@ -958,10 +936,6 @@ Be helpful, accurate, and concise. Use provided context when available."""
                 device=self.mic_device_index
             )
             sd.wait()  # Wait until recording is finished
-            
-            # Stop listening animation
-            stop_animation.set()
-            anim_thread.join(timeout=0.1)
             
             print("🔄 Processing speech...")
             
