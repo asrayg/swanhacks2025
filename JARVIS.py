@@ -28,6 +28,52 @@ oled = None
 import time
 
 
+def oled_listening_animation(stop_event):
+    """Pulsing circle animation while JARVIS is listening for input."""
+    global oled
+    if oled is None:
+        return
+
+    phase = 0
+    
+    while not stop_event.is_set():
+        image = Image.new("1", (OLED_WIDTH, OLED_HEIGHT), 255)
+        draw = ImageDraw.Draw(image)
+
+        # Pulsing concentric circles to indicate listening
+        center_x, center_y = OLED_WIDTH // 2, OLED_HEIGHT // 2
+        pulse = abs(np.sin(phase))  # Oscillates between 0 and 1
+        
+        # Draw 3 concentric circles with pulsing effect
+        for i in range(3):
+            radius = int(10 + i * 8 + pulse * 8)
+            thickness = 2 if i == 1 else 1  # Middle circle slightly thicker
+            
+            # Draw circle
+            bbox = [
+                center_x - radius, center_y - radius,
+                center_x + radius, center_y + radius
+            ]
+            draw.ellipse(bbox, outline=0, width=thickness)
+        
+        # Add a small center dot
+        center_radius = int(3 + pulse * 2)
+        center_bbox = [
+            center_x - center_radius, center_y - center_radius,
+            center_x + center_radius, center_y + center_radius
+        ]
+        draw.ellipse(center_bbox, fill=0)
+
+        # upside-down for your display
+        image = image.rotate(180)
+
+        buf = oled.getbuffer(image)
+        oled.ShowImage(buf)
+
+        phase += 0.15
+        time.sleep(0.08)
+
+
 def oled_speaking_animation(duration=3.0, speed=0.08):
     """Cool Siri-style waveform animation while JARVIS is speaking."""
     global oled
@@ -622,6 +668,15 @@ Be helpful, accurate, and concise. Use provided context when available."""
             sample_rate = int(self.mic_device['default_samplerate'])
             channels = 1
             
+            # Start listening animation
+            stop_animation = threading.Event()
+            anim_thread = threading.Thread(
+                target=oled_listening_animation,
+                args=(stop_animation,),
+                daemon=True
+            )
+            anim_thread.start()
+            
             # Record audio using sounddevice
             audio_data = sd.rec(
                 int(frame_duration * sample_rate),
@@ -631,6 +686,10 @@ Be helpful, accurate, and concise. Use provided context when available."""
                 device=self.mic_device_index
             )
             sd.wait()  # Wait until recording is finished
+            
+            # Stop listening animation
+            stop_animation.set()
+            anim_thread.join(timeout=0.1)
             
             # Debug: Check audio levels
             audio_max = np.abs(audio_data).max()
@@ -735,6 +794,15 @@ Be helpful, accurate, and concise. Use provided context when available."""
             
             print(f"🎤 Listening... Speak now! (stops automatically when you finish)")
             
+            # Start listening animation
+            stop_animation = threading.Event()
+            anim_thread = threading.Thread(
+                target=oled_listening_animation,
+                args=(stop_animation,),
+                daemon=True
+            )
+            anim_thread.start()
+            
             # Storage for audio data
             all_audio_chunks = []
             silence_time = 0
@@ -776,9 +844,15 @@ Be helpful, accurate, and concise. Use provided context when available."""
             
             if not has_speech:
                 print("\n⚠️ No speech detected")
+                stop_animation.set()
+                anim_thread.join(timeout=0.1)
                 return None
             
             print("\n🔄 Processing speech...")
+            
+            # Stop listening animation before processing
+            stop_animation.set()
+            anim_thread.join(timeout=0.1)
             
             # Concatenate all audio chunks
             audio_data = np.concatenate(all_audio_chunks, axis=0)
@@ -809,16 +883,22 @@ Be helpful, accurate, and concise. Use provided context when available."""
         
         except sr.UnknownValueError:
             print("❓ Could not understand the audio.")
+            stop_animation.set()
+            anim_thread.join(timeout=0.1)
             return None
         
         except sr.RequestError as e:
             print(f"❌ Speech recognition service error: {e}")
+            stop_animation.set()
+            anim_thread.join(timeout=0.1)
             return None
         
         except Exception as e:
             print(f"❌ Error during speech recognition: {e}")
             import traceback
             traceback.print_exc()
+            stop_animation.set()
+            anim_thread.join(timeout=0.1)
             return None
     
     def listen(
@@ -851,6 +931,15 @@ Be helpful, accurate, and concise. Use provided context when available."""
             
             print(f"🎤 Recording for {duration} seconds... Speak now!")
             
+            # Start listening animation
+            stop_animation = threading.Event()
+            anim_thread = threading.Thread(
+                target=oled_listening_animation,
+                args=(stop_animation,),
+                daemon=True
+            )
+            anim_thread.start()
+            
             # Record audio using sounddevice
             audio_data = sd.rec(
                 int(duration * sample_rate),
@@ -860,6 +949,10 @@ Be helpful, accurate, and concise. Use provided context when available."""
                 device=self.mic_device_index
             )
             sd.wait()  # Wait until recording is finished
+            
+            # Stop listening animation
+            stop_animation.set()
+            anim_thread.join(timeout=0.1)
             
             print("🔄 Processing speech...")
             
