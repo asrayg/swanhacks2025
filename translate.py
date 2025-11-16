@@ -194,50 +194,78 @@ class SpanishEnglishTranslator:
         else:
             print("ℹ️ Running without OLED display")
     
+    def list_audio_devices(self):
+        """List all available audio devices"""
+        print("\n📋 Available Audio Devices:")
+        print("="*60)
+        devices = sd.query_devices()
+        for idx, device in enumerate(devices):
+            if device['max_input_channels'] > 0:
+                print(f"  [{idx}] {device['name']}")
+                print(f"      Input Channels: {device['max_input_channels']}")
+                print(f"      Sample Rate: {device['default_samplerate']} Hz")
+        print("="*60 + "\n")
+    
     def _setup_microphone(self):
         """Setup microphone to use plughw:2,0 (hardware card 2, device 0)"""
         try:
+            # Set ALSA device environment variable for direct hardware access
+            os.environ['AUDIODEV'] = 'plughw:2,0'
+            
             devices = sd.query_devices()
             
-            # Look for device matching hw:2,0 or plughw:2,0
-            target_device_names = ['hw:2,0', 'plughw:2,0', 'pulse']
+            print("\n🔍 Searching for microphone device plughw:2,0...")
+            
+            # Strategy 1: Look for exact ALSA device name patterns
+            target_patterns = [
+                'hw:2,0', 'plughw:2,0', 'hw:2', 'card 2'
+            ]
             
             for idx, device in enumerate(devices):
-                device_name = device['name'].lower()
-                # Check if device matches our target or is an input device from card 2
-                if any(target in device_name for target in target_device_names):
-                    if device['max_input_channels'] > 0:
+                if device['max_input_channels'] > 0:
+                    device_name = device['name'].lower()
+                    if any(pattern in device_name for pattern in target_patterns):
                         self.mic_device_index = idx
                         self.mic_device = device
                         self.sample_rate = int(device['default_samplerate'])
-                        print(f"🎤 Microphone selected: {device['name']}")
-                        print(f"   Device index: {idx}")
+                        print(f"✅ Found target device!")
+                        print(f"   Device: {device['name']}")
+                        print(f"   Index: {idx}")
                         print(f"   Sample rate: {self.sample_rate} Hz")
                         print(f"   Channels: {device['max_input_channels']}")
                         return
             
-            # If no specific device found, try to find any device with "2" in hostapi
-            print("⚠️ Specific device plughw:2,0 not found by name, searching by index...")
-            
-            # Try to manually set to device index that corresponds to hw:2,0
-            # Typically ALSA devices are listed sequentially
+            # Strategy 2: Try PulseAudio device (which can route to plughw:2,0)
+            print("⚠️ Direct ALSA device not found, trying PulseAudio...")
             for idx, device in enumerate(devices):
                 if device['max_input_channels'] > 0:
-                    if 'pulse' in device['name'].lower() or idx >= 2:
+                    if 'pulse' in device['name'].lower():
                         self.mic_device_index = idx
                         self.mic_device = device
                         self.sample_rate = int(device['default_samplerate'])
-                        print(f"🎤 Using microphone: {device['name']}")
-                        print(f"   Device index: {idx}")
+                        print(f"✅ Using PulseAudio (will route to plughw:2,0)")
+                        print(f"   Device: {device['name']}")
+                        print(f"   Index: {idx}")
                         print(f"   Sample rate: {self.sample_rate} Hz")
                         return
             
-            # Fallback to default device
-            print("⚠️ Could not find plughw:2,0, using default device")
-            self.mic_device_index = None  # Use system default
+            # Strategy 3: Use default input device
+            print("⚠️ Falling back to default input device")
+            self.list_audio_devices()
+            default_input = sd.default.device[0]
+            if default_input is not None:
+                self.mic_device_index = default_input
+                self.mic_device = devices[default_input]
+                self.sample_rate = int(self.mic_device['default_samplerate'])
+                print(f"✅ Using default device: {self.mic_device['name']}")
+            else:
+                print("⚠️ Using system default (no specific device)")
+                self.mic_device_index = None
             
         except Exception as e:
             print(f"❌ Error setting up microphone: {e}")
+            import traceback
+            traceback.print_exc()
             print("   Will use system default device")
             self.mic_device_index = None
         
@@ -298,12 +326,20 @@ class SpanishEnglishTranslator:
         # Concatenate all audio chunks
         audio_data = np.concatenate(all_audio_chunks, axis=0)
         
+        # Convert stereo to mono if needed (for Whisper compatibility)
+        if actual_channels == 2 and len(audio_data.shape) > 1:
+            # Average the two channels to create mono
+            audio_data = audio_data.mean(axis=1).astype('int16')
+            final_channels = 1
+        else:
+            final_channels = actual_channels
+        
         # Save to temp file
         with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as temp_file:
             temp_filename = temp_file.name
             
         with wave.open(temp_filename, 'wb') as wf:
-            wf.setnchannels(self.channels)
+            wf.setnchannels(final_channels)
             wf.setsampwidth(2)  # 2 bytes for int16
             wf.setframerate(self.sample_rate)
             wf.writeframes(audio_data.tobytes())
