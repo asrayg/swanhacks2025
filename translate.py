@@ -207,63 +207,26 @@ class SpanishEnglishTranslator:
         print("="*60 + "\n")
     
     def _setup_microphone(self):
-        """Setup microphone to use plughw:2,0 (hardware card 2, device 0)"""
+        """Setup microphone to use default device"""
         try:
-            # Set ALSA device environment variable for direct hardware access
-            os.environ['AUDIODEV'] = 'plughw:2,0'
-            
             devices = sd.query_devices()
-            
-            print("\n🔍 Searching for microphone device plughw:2,0...")
-            
-            # Strategy 1: Look for exact ALSA device name patterns
-            target_patterns = [
-                'hw:2,0', 'plughw:2,0', 'hw:2', 'card 2'
-            ]
-            
-            for idx, device in enumerate(devices):
-                if device['max_input_channels'] > 0:
-                    device_name = device['name'].lower()
-                    if any(pattern in device_name for pattern in target_patterns):
-                        self.mic_device_index = idx
-                        self.mic_device = device
-                        self.sample_rate = int(device['default_samplerate'])
-                        print(f"✅ Found target device!")
-                        print(f"   Device: {device['name']}")
-                        print(f"   Index: {idx}")
-                        print(f"   Sample rate: {self.sample_rate} Hz")
-                        print(f"   Channels: {device['max_input_channels']}")
-                        return
-            
-            # Strategy 2: Try PulseAudio device (which can route to plughw:2,0)
-            print("⚠️ Direct ALSA device not found, trying PulseAudio...")
-            for idx, device in enumerate(devices):
-                if device['max_input_channels'] > 0:
-                    if 'pulse' in device['name'].lower():
-                        self.mic_device_index = idx
-                        self.mic_device = device
-                        self.sample_rate = int(device['default_samplerate'])
-                        print(f"✅ Using PulseAudio (will route to plughw:2,0)")
-                        print(f"   Device: {device['name']}")
-                        print(f"   Index: {idx}")
-                        print(f"   Sample rate: {self.sample_rate} Hz")
-                        return
-            
-            # Strategy 3: Use default input device
-            print("⚠️ Falling back to default input device")
-            self.list_audio_devices()
             default_input = sd.default.device[0]
+            
             if default_input is not None:
                 self.mic_device_index = default_input
                 self.mic_device = devices[default_input]
                 self.sample_rate = int(self.mic_device['default_samplerate'])
-                print(f"✅ Using default device: {self.mic_device['name']}")
+                print(f"\n✅ Using default microphone:")
+                print(f"   Device: {self.mic_device['name']}")
+                print(f"   Index: {default_input}")
+                print(f"   Sample rate: {self.sample_rate} Hz")
+                print(f"   Channels: {self.mic_device['max_input_channels']}")
             else:
-                print("⚠️ Using system default (no specific device)")
+                print("\n✅ Using system default microphone")
                 self.mic_device_index = None
             
         except Exception as e:
-            print(f"❌ Error setting up microphone: {e}")
+            print(f"\n❌ Error setting up microphone: {e}")
             import traceback
             traceback.print_exc()
             print("   Will use system default device")
