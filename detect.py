@@ -12,6 +12,7 @@ import threading
 import re
 import random
 import subprocess
+print("🔵 detect.py STARTED")
 
 load_dotenv()
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
@@ -472,6 +473,8 @@ def save_output(report, audio_file, frames, session_folder):
 # MAIN LOOP
 # -----------------------------
 def main():
+    print("🔵 please STARTED")
+
     # Create output folder
     session_ts = datetime.now().strftime("%Y%m%d_%H%M%S")
     session_folder = f"output/session_{session_ts}"
