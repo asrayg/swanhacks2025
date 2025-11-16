@@ -16,12 +16,11 @@ from supabase import create_client, Client
 from PIL import Image, ImageDraw, ImageFont
 from driver import OLED_1in51, OLED_WIDTH, OLED_HEIGHT
 import numpy as np
+oled = None
 
 load_dotenv()
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-oled = OLED_1in51()
-oled.Init()
 
 
 # -----------------------------
@@ -585,6 +584,10 @@ def save_output(report, audio_file, frames, session_folder):
 # MAIN LOOP
 # -----------------------------
 def main():
+    global oled
+    oled = OLED_1in51()
+    oled.Init()
+
     print("🔵 please STARTED")
 
     # Create output folder
