@@ -52,35 +52,46 @@ security_units = {
     "Unit B": "4 minutes away"
 }
 
-def oled_print(text, size=12):
-    """Render text onto 128x64 OLED screen."""
+def oled_print(text, size=9):
+    global oled
+
+    # Create blank image
     image = Image.new("1", (OLED_WIDTH, OLED_HEIGHT), 255)
     draw = ImageDraw.Draw(image)
 
-    # Use default PIL font
-    font = ImageFont.load_default()
+    # Smaller readable font
+    try:
+        font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", size)
+    except:
+        font = ImageFont.load_default()
 
-    # Split long text
-    lines = []
+    # Split text into lines (approx 18 chars/line)
     words = text.split()
     line = ""
-
+    lines = []
     for w in words:
-        if len(line + " " + w) < 20:  # approx fit per line
+        if len(line) + len(w) < 18:
             line += " " + w
         else:
             lines.append(line.strip())
             line = w
     lines.append(line.strip())
 
-    # Limit to 4 lines of 16–18 characters each
+    # Draw max 4 lines
     y = 0
     for ln in lines[:4]:
         draw.text((0, y), ln, font=font, fill=0)
-        y += 16
+        y += size + 3
 
+    # Rotate entire screen upside down
+    image = image.rotate(180)
+
+    # Send output
     buf = oled.getbuffer(image)
     oled.ShowImage(buf)
+
+    # Slow output so text doesn’t flicker/flash too fast
+    time.sleep(0.4)
 
 
 # -----------------------------
