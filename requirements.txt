@@ -35,6 +35,6 @@ openai
 opencv-python
 numpy
 requests
-gradio==3.50.2
 supabase>=2.0.0
 websockets
+pyaudio

@@ -170,10 +170,15 @@ class OLED_1in51:
 class SpanishEnglishTranslator:
     def __init__(self):
         self.is_running = False
-        self.sample_rate = 16000
-        self.channels = 1
+        self.sample_rate = 44100  # CD quality, standard for plughw
+        self.channels = 2  # Stereo
         self.silence_threshold = 1500  # Energy threshold for silence
         self.silence_duration = 1.5  # Seconds of silence before stopping
+        
+        # Setup microphone device (plughw:2,0)
+        self.mic_device = None
+        self.mic_device_index = None
+        self._setup_microphone()
         
         # Initialize OLED display if available
         self.oled = None
@@ -188,6 +193,53 @@ class SpanishEnglishTranslator:
                 self.oled = None
         else:
             print("ℹ️ Running without OLED display")
+    
+    def _setup_microphone(self):
+        """Setup microphone to use plughw:2,0 (hardware card 2, device 0)"""
+        try:
+            devices = sd.query_devices()
+            
+            # Look for device matching hw:2,0 or plughw:2,0
+            target_device_names = ['hw:2,0', 'plughw:2,0', 'pulse']
+            
+            for idx, device in enumerate(devices):
+                device_name = device['name'].lower()
+                # Check if device matches our target or is an input device from card 2
+                if any(target in device_name for target in target_device_names):
+                    if device['max_input_channels'] > 0:
+                        self.mic_device_index = idx
+                        self.mic_device = device
+                        self.sample_rate = int(device['default_samplerate'])
+                        print(f"🎤 Microphone selected: {device['name']}")
+                        print(f"   Device index: {idx}")
+                        print(f"   Sample rate: {self.sample_rate} Hz")
+                        print(f"   Channels: {device['max_input_channels']}")
+                        return
+            
+            # If no specific device found, try to find any device with "2" in hostapi
+            print("⚠️ Specific device plughw:2,0 not found by name, searching by index...")
+            
+            # Try to manually set to device index that corresponds to hw:2,0
+            # Typically ALSA devices are listed sequentially
+            for idx, device in enumerate(devices):
+                if device['max_input_channels'] > 0:
+                    if 'pulse' in device['name'].lower() or idx >= 2:
+                        self.mic_device_index = idx
+                        self.mic_device = device
+                        self.sample_rate = int(device['default_samplerate'])
+                        print(f"🎤 Using microphone: {device['name']}")
+                        print(f"   Device index: {idx}")
+                        print(f"   Sample rate: {self.sample_rate} Hz")
+                        return
+            
+            # Fallback to default device
+            print("⚠️ Could not find plughw:2,0, using default device")
+            self.mic_device_index = None  # Use system default
+            
+        except Exception as e:
+            print(f"❌ Error setting up microphone: {e}")
+            print("   Will use system default device")
+            self.mic_device_index = None
         
     def record_with_silence_detection(self, max_duration=30):
         """Record audio until silence is detected"""
@@ -201,13 +253,19 @@ class SpanishEnglishTranslator:
         has_speech = False
         total_time = 0
         
+        # Determine actual channels to use
+        actual_channels = self.channels
+        if self.mic_device:
+            actual_channels = min(self.channels, self.mic_device['max_input_channels'])
+        
         while total_time < max_duration and self.is_running:
             # Record a chunk
             chunk_data = sd.rec(
                 int(chunk_duration * self.sample_rate),
                 samplerate=self.sample_rate,
-                channels=self.channels,
-                dtype='int16'
+                channels=actual_channels,
+                dtype='int16',
+                device=self.mic_device_index
             )
             sd.wait()  # Wait for chunk to complete
             
