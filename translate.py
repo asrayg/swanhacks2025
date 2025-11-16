@@ -241,9 +241,8 @@ class SpanishEnglishTranslator:
                 audio_data = base64.b64encode(f.read()).decode('utf-8')
             
             response = client.chat.completions.create(
-                model="gpt-4o-audio-preview",
+                model="gpt-4o-transcribe",
                 modalities=["text"],
-                audio={"voice": "alloy", "format": "wav"},
                 messages=[
                     {
                         "role": "user",
@@ -325,7 +324,7 @@ class SpanishEnglishTranslator:
         """Translate Spanish to English"""
         try:
             translation = client.chat.completions.create(
-                model="gpt-4o-mini",
+                model="gpt-5.1",
                 messages=[
                     {
                         "role": "system",
@@ -346,7 +345,7 @@ class SpanishEnglishTranslator:
         """Translate English to Spanish"""
         try:
             translation = client.chat.completions.create(
-                model="gpt-4o-mini",
+                model="gpt-5.1",
                 messages=[
                     {
                         "role": "system",
