@@ -97,19 +97,17 @@ class AudioRecorder:
         return True
     
 def capture_frame(path="/dev/shm/frame.jpg"):
-    """Capture a single frame using rpicam-still with no preview (headless-safe)."""
+    """Reliable single-frame capture using rpicam-still (headless-safe)."""
     cmd = [
         "rpicam-still",
-        "--nopreview",        # fully disables preview pipeline
-        "--immediate",        # no display warmup
-        "-t", "1",
+        "-t", "1",        # tiny timeout for capture
         "--width", "640",
         "--height", "480",
+        "-n",             # no preview
         "-o", path
     ]
     subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     return cv2.imread(path)
-
 
 def detect_shutdown_command(text):
     if not text:
