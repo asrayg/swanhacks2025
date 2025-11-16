@@ -23,6 +23,9 @@ from PIL import Image, ImageDraw, ImageFont
 import threading
 from driver import OLED_1in51, OLED_WIDTH, OLED_HEIGHT
 import numpy as np
+
+# Global OLED instance - shared with detect module
+# Will be set by main.py to avoid hardware conflicts
 oled = None
 
 import time
@@ -32,9 +35,12 @@ def oled_listening_animation(stop_event):
     """Pulsing circle animation while JARVIS is listening for input."""
     global oled
     if oled is None:
+        print("⚠️  Listening animation: OLED is None, skipping animation")
         return
-
+    
+    print("🎬 Listening animation started")
     phase = 0
+    frame_count = 0
     
     while not stop_event.is_set():
         image = Image.new("1", (OLED_WIDTH, OLED_HEIGHT), 255)
@@ -71,7 +77,10 @@ def oled_listening_animation(stop_event):
         oled.ShowImage(buf)
 
         phase += 0.15
+        frame_count += 1
         time.sleep(0.08)
+    
+    print(f"🎬 Listening animation stopped (rendered {frame_count} frames)")
 
 
 def oled_speaking_animation(duration=3.0, speed=0.08):
@@ -122,7 +131,7 @@ class JARVIS:
     def __init__(
         self,
         api_key: Optional[str] = None,
-        model: str = "gpt-5.1",
+        model: str = "gpt-5.1-nano",
         embedding_model: str = "text-embedding-3-small",
         temperature: float = 0.2,
         db_path: Optional[str] = None,

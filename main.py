@@ -317,8 +317,20 @@ if __name__ == "__main__":
     print("🎥 Detection system started in background thread")
     print("   (Initializing webcam and audio monitoring...)\n")
     
-    # Give detect thread time to initialize
-    time.sleep(2)
+    # Wait for detect to initialize OLED, with verification
+    max_wait = 10  # Maximum 10 seconds
+    waited = 0
+    while detect.oled is None and waited < max_wait:
+        time.sleep(0.5)
+        waited += 0.5
+    
+    if detect.oled is None:
+        print("⚠️  Warning: OLED not initialized by detect module")
+    else:
+        # Share the OLED instance with JARVIS module
+        import JARVIS as jarvis_module
+        jarvis_module.oled = detect.oled
+        print("🖥️  OLED instance shared with JARVIS")
     
     try:
         main()
