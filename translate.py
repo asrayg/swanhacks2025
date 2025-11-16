@@ -270,10 +270,12 @@ class SpanishEnglishTranslator:
             self.mic_device_index = None
         
     def record_with_silence_detection(self, max_duration=30):
-        """Record audio until silence is detected"""
+        """Record audio until silence is detected with live visualization"""
         chunk_duration = 0.5  # 500ms chunks
         
-        print("🎤 Listening... Speak now!", end="\r")
+        print("\n" + "="*70)
+        print("🎤 LIVE AUDIO MONITORING")
+        print("="*70)
         
         # Storage for audio data
         all_audio_chunks = []
@@ -285,6 +287,11 @@ class SpanishEnglishTranslator:
         actual_channels = self.channels
         if self.mic_device:
             actual_channels = min(self.channels, self.mic_device['max_input_channels'])
+        
+        # For live transcription attempts
+        transcribe_interval = 2.0  # Try to transcribe every 2 seconds
+        last_transcribe_time = 0
+        partial_transcript = ""
         
         while total_time < max_duration and self.is_running:
             # Record a chunk
@@ -303,24 +310,48 @@ class SpanishEnglishTranslator:
             # Calculate energy (volume) of chunk
             energy = np.abs(chunk_data).mean()
             
+            # Create visual audio level meter
+            meter_width = 50
+            energy_normalized = min(energy / 3000, 1.0)  # Normalize to 0-1
+            filled_bars = int(energy_normalized * meter_width)
+            meter = "█" * filled_bars + "░" * (meter_width - filled_bars)
+            
+            # Status display
             if energy > self.silence_threshold:
                 # Speech detected
                 silence_time = 0
                 has_speech = True
-                print("🎤 Listening... (speaking detected)", end="\r")
+                status = f"🔴 SPEAKING [{total_time:5.1f}s] {meter} {int(energy):5d}"
             else:
                 # Silence detected
                 if has_speech:
                     silence_time += chunk_duration
-                    print(f"🎤 Listening... (silence {silence_time:.1f}s)", end="\r")
+                    status = f"🟡 SILENCE  [{total_time:5.1f}s] {meter} {int(energy):5d} (pause: {silence_time:.1f}s)"
+                else:
+                    status = f"🟢 WAITING  [{total_time:5.1f}s] {meter} {int(energy):5d}"
+            
+            # Print status on same line
+            print(f"\r{status}", end="", flush=True)
+            
+            # Attempt live transcription every N seconds
+            if has_speech and (total_time - last_transcribe_time) >= transcribe_interval:
+                last_transcribe_time = total_time
+                try:
+                    # Try to transcribe recent audio
+                    self._attempt_live_transcription(all_audio_chunks, actual_channels)
+                except:
+                    pass  # Ignore transcription errors during live monitoring
             
             # Stop if we've had enough silence after speech
             if has_speech and silence_time >= self.silence_duration:
-                print("\n✅ Speech ended, processing...       ")
+                print(f"\n{'='*70}")
+                print("✅ Speech ended, processing final transcription...")
                 break
         
         if not has_speech:
-            print("\n⚠️  No speech detected                ")
+            print(f"\n{'='*70}")
+            print("⚠️  No speech detected")
+            print("="*70 + "\n")
             return None
         
         # Concatenate all audio chunks
@@ -345,6 +376,60 @@ class SpanishEnglishTranslator:
             wf.writeframes(audio_data.tobytes())
         
         return temp_filename
+    
+    def _attempt_live_transcription(self, audio_chunks, channels):
+        """Attempt to transcribe recent audio chunks and display live"""
+        try:
+            # Use last 3 seconds of audio for live transcription
+            recent_duration = 3.0
+            chunks_to_use = int(recent_duration / 0.5)
+            recent_chunks = audio_chunks[-chunks_to_use:] if len(audio_chunks) > chunks_to_use else audio_chunks
+            
+            if not recent_chunks:
+                return
+            
+            # Concatenate recent audio
+            audio_data = np.concatenate(recent_chunks, axis=0)
+            
+            # Convert stereo to mono if needed
+            if channels == 2 and len(audio_data.shape) > 1:
+                audio_data = audio_data.mean(axis=1).astype('int16')
+                final_channels = 1
+            else:
+                final_channels = channels
+            
+            # Save to temp file
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as temp_file:
+                temp_filename = temp_file.name
+            
+            with wave.open(temp_filename, 'wb') as wf:
+                wf.setnchannels(final_channels)
+                wf.setsampwidth(2)
+                wf.setframerate(self.sample_rate)
+                wf.writeframes(audio_data.tobytes())
+            
+            # Quick transcription (no verbose mode to save time)
+            with open(temp_filename, "rb") as f:
+                transcript = client.audio.transcriptions.create(
+                    model="whisper-1",
+                    file=f
+                )
+            
+            # Clean up temp file
+            try:
+                os.remove(temp_filename)
+            except:
+                pass
+            
+            if transcript.text.strip():
+                # Display live transcript on a new line
+                print(f"\n💬 Live: \"{transcript.text.strip()}\"")
+                # Return cursor to status line
+                print("", end="", flush=True)
+        
+        except Exception as e:
+            # Silently fail for live transcription
+            pass
     
     def transcribe_audio(self, audio_file):
         """Transcribe audio and detect language"""
@@ -528,13 +613,13 @@ class SpanishEnglishTranslator:
                     time.sleep(0.5)
                     continue
                 
-                print("⚙️  Transcribing...", end="\r")
+                print("⚙️  Transcribing final audio...", end="\r")
                 
                 # Transcribe
                 text, detected_lang = self.transcribe_audio(audio_file)
                 
                 if not text:
-                    print("🟢 Ready for next input...   \n")
+                    print("\n🟢 Ready for next input...\n")
                     continue
                 
                 timestamp = datetime.now().strftime("%H:%M:%S")
@@ -544,38 +629,43 @@ class SpanishEnglishTranslator:
                 
                 if language == "spanish":
                     # Spanish → English
-                    print(f"\n{'='*60}")
-                    print(f"[{timestamp}] 🇪🇸 SPANISH DETECTED:")
-                    print(f"  {text}")
-                    print(f"  (Detected: {detected_lang})")
+                    print(f"\n{'='*70}")
+                    print(f"📝 FINAL TRANSCRIPTION [{timestamp}]")
+                    print(f"{'='*70}")
+                    print(f"🇪🇸 SPANISH: {text}")
+                    print(f"   (Whisper detected: {detected_lang})")
+                    print(f"{'-'*70}")
+                    print(f"🔄 Translating Spanish → English...")
                     
                     english_translation = self.translate_to_english(text)
                     
                     if english_translation:
-                        print(f"\n[{timestamp}] 🇬🇧 ENGLISH TRANSLATION:")
-                        print(f"  {english_translation}")
-                        print(f"\n🔊 Speaking in English...")
+                        print(f"🇬🇧 ENGLISH: {english_translation}")
+                        print(f"{'-'*70}")
+                        print(f"🔊 Speaking translation in English...")
                         self.speak_text(english_translation)
-                        print(f"✅ TTS completed")
-                    print(f"{'='*60}")
+                        print(f"✅ Complete!")
+                    print(f"{'='*70}\n")
                     
                 else:  # English
                     # English → Spanish
-                    print(f"\n{'='*60}")
-                    print(f"[{timestamp}] 🇬🇧 ENGLISH DETECTED:")
-                    print(f"  {text}")
-                    print(f"  (Detected: {detected_lang})")
+                    print(f"\n{'='*70}")
+                    print(f"📝 FINAL TRANSCRIPTION [{timestamp}]")
+                    print(f"{'='*70}")
+                    print(f"🇬🇧 ENGLISH: {text}")
+                    print(f"   (Whisper detected: {detected_lang})")
+                    print(f"{'-'*70}")
+                    print(f"🔄 Translating English → Spanish...")
                     
                     spanish_translation = self.translate_to_spanish(text)
                     
                     if spanish_translation:
-                        print(f"\n[{timestamp}] 🇪🇸 SPANISH TRANSLATION:")
-                        print(f"  {spanish_translation}")
-                        
-                        print(f"\n🔊 Speaking in Spanish...")
+                        print(f"🇪🇸 SPANISH: {spanish_translation}")
+                        print(f"{'-'*70}")
+                        print(f"🔊 Speaking translation in Spanish...")
                         self.speak_text(spanish_translation)
-                        print(f"✅ TTS completed")
-                    print(f"{'='*60}")
+                        print(f"✅ Complete!")
+                    print(f"{'='*70}\n")
                 
             except KeyboardInterrupt:
                 break
@@ -587,16 +677,23 @@ class SpanishEnglishTranslator:
         """Start the translator"""
         self.is_running = True
         
-        print("\n" + "="*60)
-        print("🇪🇸 ↔️ 🇬🇧 SPANISH-ENGLISH LIVE TRANSLATOR")
-        print("="*60)
-        print("\nHow it works:")
-        print("  • Automatically detects Spanish or English")
-        print("  • Spanish → English translation + TTS")
-        print("  • English → Spanish translation + TTS")
-        print("  • Automatic silence detection (stops after 1.5s)")
-        print("\nPress Ctrl+C to stop\n")
-        print("="*60 + "\n")
+        print("\n" + "="*70)
+        print("🇪🇸 ↔️ 🇬🇧 SPANISH-ENGLISH LIVE TRANSLATOR WITH REAL-TIME DISPLAY")
+        print("="*70)
+        print("\n✨ Features:")
+        print("  • Live audio visualization with volume meter")
+        print("  • Real-time word detection as you speak")
+        print("  • Automatic language detection (Spanish/English)")
+        print("  • Bidirectional translation with TTS")
+        print("  • Auto-stops after 1.5s of silence")
+        print("  • English translations scroll on OLED display")
+        print("\n📊 Visual Indicators:")
+        print("  🔴 SPEAKING - Active speech detected")
+        print("  🟡 SILENCE  - Pause detected (counting down)")
+        print("  🟢 WAITING  - Ready for input")
+        print("\n💬 Live transcription updates every 2 seconds")
+        print("\nPress Ctrl+C to stop")
+        print("="*70 + "\n")
         
         try:
             self.listen_loop()

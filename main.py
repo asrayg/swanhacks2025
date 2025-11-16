@@ -40,9 +40,8 @@ def listen_for_wake_words(jarvis, frame_duration=2):
 
 def main():
     # Create JARVIS instance
-    print("="*60)
     print("🩺 JARVIS - Nursing Assistant")
-    print("="*60)
+    print("="*6)
     print("\nInitializing JARVIS...")
     print("(Loading system instructions from jarvis_instructions.txt)")
     jarvis = create_jarvis()
@@ -71,9 +70,9 @@ def main():
     # Initialize translator
     translator = SpanishEnglishTranslator()
     
-    print("\n" + "="*60)
+    print("\n" + "="*6)
     print("🎙️  JARVIS Nursing Assistant - Voice Interface")
-    print("="*60)
+    print("="*6)
     print("\n✨ Wake Words:")
     print("   • Say 'JEFF' → Activate JARVIS nursing assistant")
     print("   • Say 'TRANSLATE' → Activate Spanish-English translator")
@@ -84,7 +83,7 @@ def main():
     print("   - Translator: Real-time Spanish ↔ English")
     print("   - Press Ctrl+C to exit")
     print("\n⚙️  Status: Ready - listening for wake words")
-    print("="*60 + "\n")
+    print("="*6 + "\n")
     
     frame_count = 0
     try:
@@ -131,7 +130,7 @@ def main():
                 print("   • 'stop translating' or 'end translating'")
                 print("   • 'stop translation' or 'end translation'")
                 print("   • Or press Ctrl+C\n")
-                print("="*60 + "\n")
+                print("="*6 + "\n")
                 
                 # Enter continuous translator mode
                 translator.is_running = True
@@ -174,7 +173,7 @@ def main():
                         
                         if language == "spanish":
                             # Spanish → English
-                            print(f"\n{'='*60}")
+                            print(f"\n{'='*6}")
                             print(f"[{timestamp_str}] 🇪🇸 SPANISH DETECTED:")
                             print(f"  {text}")
                             print(f"  (Whisper detected: {detected_lang})")
@@ -187,10 +186,10 @@ def main():
                                 print(f"\n🔊 Speaking in English...")
                                 translator.speak_text(english_translation)
                                 print("✅ TTS completed")
-                            print(f"{'='*60}\n")
+                            print(f"{'='*6}\n")
                         else:  # English
                             # English → Spanish
-                            print(f"\n{'='*60}")
+                            print(f"\n{'='*6}")
                             print(f"[{timestamp_str}] 🇬🇧 ENGLISH DETECTED:")
                             print(f"  {text}")
                             print(f"  (Whisper detected: {detected_lang})")
@@ -203,7 +202,7 @@ def main():
                                 print(f"\n🔊 Speaking in Spanish...")
                                 translator.speak_text(spanish_translation)
                                 print("✅ TTS completed")
-                            print(f"{'='*60}\n")
+                            print(f"{'='*6}\n")
                         
                         print("🟢 Ready for next input...\n")
                 
@@ -214,7 +213,7 @@ def main():
                 
                 translator.is_running = False
                 print("\n🔙 Returning to wake word detection...\n")
-                print("="*60 + "\n")
+                print("="*6 + "\n")
                 frame_count = 0  # Reset frame counter after translator
     
     except KeyboardInterrupt:
