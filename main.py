@@ -55,15 +55,16 @@ def main():
     print("\n📚 Loading clinical context...")
     try:
         # Recursively add all .txt files from output folder
-        if os.path.exists("output"):
-            chunks = jarvis.add_context_from_directory("output", recursive=True)
-            if chunks > 0:
-                print(f"✅ Loaded clinical reports from output folder")
+        # if os.path.exists("output"):
+        #     chunks = jarvis.add_context_from_directory("output", recursive=True)
+        #     if chunks > 0:
+        #         print(f"✅ Loaded clinical reports from output folder")
         
-        # Add knowledge base if it exists
-        if os.path.exists("jarvis_kb.txt"):
-            jarvis.add_context_from_file("jarvis_kb.txt")
-            print(f"✅ Loaded knowledge base")
+        # # Add knowledge base if it exists
+        # if os.path.exists("jarvis_kb.txt"):
+        #     jarvis.add_context_from_file("jarvis_kb.txt")
+        #     print(f"✅ Loaded knowledge base")
+        pass
     except Exception as e:
         print(f"⚠️ Warning loading context: {e}")
     
@@ -222,15 +223,15 @@ def main():
         translator.is_running = False
 
 if __name__ == "__main__":
-    # Start detect in a separate thread
-    detect_thread = threading.Thread(target=detect.main, daemon=True)
-    detect_thread.start()
+    # # Start detect in a separate thread
+    # detect_thread = threading.Thread(target=detect.main, daemon=True)
+    # detect_thread.start()
     
-    print("🎥 Detection system started in background thread")
-    print("   (Initializing webcam and audio monitoring...)\n")
+    # print("🎥 Detection system started in background thread")
+    # print("   (Initializing webcam and audio monitoring...)\n")
     
-    # Give detect thread time to initialize
-    time.sleep(2)
+    # # Give detect thread time to initialize
+    # time.sleep(2)
     
     try:
         main()
