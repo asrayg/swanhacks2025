@@ -8,19 +8,168 @@ import os
 from datetime import datetime
 import tempfile
 import subprocess
+import threading
+
+# OLED imports
+try:
+    import board
+    import digitalio
+    import busio
+    from PIL import Image, ImageDraw, ImageFont
+    OLED_AVAILABLE = True
+except ImportError:
+    OLED_AVAILABLE = False
+    print("⚠️  OLED libraries not available (board, busio, PIL)")
 
 load_dotenv()
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
+
+class OLED_1in51:
+    """OLED Display Driver for 128x64 screen"""
+    def __init__(self):
+        if not OLED_AVAILABLE:
+            raise RuntimeError("OLED libraries not available")
+        
+        # SPI
+        self.spi = busio.SPI(board.SCLK, MOSI=board.MOSI)
+        
+        # Pins
+        self.dc = digitalio.DigitalInOut(board.D24)
+        self.rst = digitalio.DigitalInOut(board.D25)
+        self.cs = digitalio.DigitalInOut(board.D8)
+        for pin in [self.dc, self.rst, self.cs]:
+            pin.direction = digitalio.Direction.OUTPUT
+        
+        # Configure SPI
+        while not self.spi.try_lock():
+            pass
+        self.spi.configure(baudrate=8000000, phase=0, polarity=0)
+        self.spi.unlock()
+        
+        self.width = 128
+        self.height = 64
+        
+        # Initialize display
+        self.reset()
+        self.init_display()
+    
+    def command(self, cmd):
+        self.dc.value = 0
+        self.cs.value = 0
+        self.spi.write(bytes([cmd]))
+        self.cs.value = 1
+    
+    def data(self, data):
+        self.dc.value = 1
+        self.cs.value = 0
+        self.spi.write(data)
+        self.cs.value = 1
+    
+    def reset(self):
+        self.rst.value = 0
+        time.sleep(0.2)
+        self.rst.value = 1
+        time.sleep(0.2)
+    
+    def init_display(self):
+        cmds = [
+            0xAE, 0xD5, 0xA0, 0xA8, 0x3F, 0xD3, 0x00,
+            0x40, 0xA1, 0xC8, 0xDA, 0x12, 0x81, 0x7F,
+            0xA4, 0xA6, 0xD9, 0xF1, 0xDB, 0x40, 0xAF
+        ]
+        for c in cmds:
+            self.command(c)
+    
+    def getbuffer(self, image):
+        buf = [0x00] * (self.width * self.height // 8)
+        img = image.convert("1")
+        pixels = img.load()
+        for y in range(self.height):
+            for x in range(self.width):
+                if pixels[x, y] == 0:
+                    buf[x + (y // 8) * self.width] |= (1 << (y % 8))
+        return buf
+    
+    def show_image(self, buf):
+        for page in range(8):
+            self.command(0xB0 + page)
+            self.command(0x00)
+            self.command(0x10)
+            start = page * 128
+            end = start + 128
+            self.data(bytes(buf[start:end]))
+    
+    def clear(self):
+        """Clear the display (white background)"""
+        img = Image.new("1", (self.width, self.height), "white")
+        buf = self.getbuffer(img)
+        self.show_image(buf)
+    
+    def show_text(self, text, font_size=16, center=True):
+        """Display text on the OLED"""
+        img = Image.new("1", (self.width, self.height), "white")
+        draw = ImageDraw.Draw(img)
+        
+        try:
+            font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", font_size)
+        except:
+            font = ImageFont.load_default()
+        
+        # Wrap text to fit screen width
+        lines = []
+        words = text.split()
+        current_line = ""
+        
+        for word in words:
+            test_line = current_line + " " + word if current_line else word
+            bbox = draw.textbbox((0, 0), test_line, font=font)
+            if bbox[2] - bbox[0] <= self.width - 10:
+                current_line = test_line
+            else:
+                if current_line:
+                    lines.append(current_line)
+                current_line = word
+        
+        if current_line:
+            lines.append(current_line)
+        
+        # Draw lines
+        y_offset = 10
+        for line in lines[:3]:  # Max 3 lines
+            if center:
+                bbox = draw.textbbox((0, 0), line, font=font)
+                text_width = bbox[2] - bbox[0]
+                x = (self.width - text_width) // 2
+            else:
+                x = 5
+            draw.text((x, y_offset), line, fill="black", font=font)
+            y_offset += font_size + 4
+        
+        buf = self.getbuffer(img)
+        self.show_image(buf)
+
+
 class SpanishEnglishTranslator:
-    def __init__(self, auto_calibrate=True):
+    def __init__(self, silence_threshold=None, auto_calibrate=False, use_oled=True):
         self.is_running = False
         self.sample_rate = 16000
         self.channels = 1
-        self.silence_threshold = 10000  # Energy threshold for silence
+        self.silence_threshold = silence_threshold if silence_threshold is not None else 3000
         self.silence_duration = 1.5  # Seconds of silence before stopping
         self.auto_calibrate = auto_calibrate
-        self.calibrated = False
+        self.calibrated = not auto_calibrate  # Skip calibration if threshold provided
+        
+        # Initialize OLED display if available and requested
+        self.oled = None
+        if use_oled and OLED_AVAILABLE:
+            try:
+                self.oled = OLED_1in51()
+                self.oled.clear()
+                print("✅ OLED display initialized")
+            except Exception as e:
+                print(f"⚠️  OLED initialization failed: {e}")
+                self.oled = None
         
     def record_with_silence_detection(self, max_duration=30):
         """Record audio until silence is detected"""
@@ -205,7 +354,7 @@ class SpanishEnglishTranslator:
             return None
         
     def speak_text(self, text):
-        """Generate and play speech"""
+        """Generate and play speech with OLED scrolling text"""
         try:
             response = client.audio.speech.create(
                 model="tts-1-hd",
@@ -218,32 +367,102 @@ class SpanishEnglishTranslator:
                 temp_file.write(response.content)
                 speech_file = temp_file.name
             
-            # Play audio using available audio player
-            try:
-                # Try mpv (common on Linux)
-                subprocess.run(
-                    ["mpv", "--really-quiet", speech_file],
-                    check=True,
-                    capture_output=True
-                )
-            except (FileNotFoundError, subprocess.CalledProcessError):
+            # Estimate speech duration
+            words = len(text.split())
+            base_duration = (words / 150) * 60  # ~150 words per minute
+            adjusted_duration = base_duration / 0.75  # Adjust for speed=0.75
+            
+            # If OLED available, scroll text while speaking
+            if self.oled:
+                # Start audio playback in background thread
+                audio_finished = threading.Event()
+                
+                def play_audio():
+                    try:
+                        # Try mpv (common on Linux)
+                        subprocess.run(
+                            ["mpv", "--really-quiet", speech_file],
+                            check=True,
+                            capture_output=True
+                        )
+                    except (FileNotFoundError, subprocess.CalledProcessError):
+                        try:
+                            # Try ffplay (from ffmpeg)
+                            subprocess.run(
+                                ["ffplay", "-nodisp", "-autoexit", "-loglevel", "quiet", speech_file],
+                                check=True,
+                                capture_output=True
+                            )
+                        except (FileNotFoundError, subprocess.CalledProcessError):
+                            try:
+                                # Try paplay (PulseAudio)
+                                subprocess.run(
+                                    ["paplay", speech_file],
+                                    check=True,
+                                    capture_output=True
+                                )
+                            except (FileNotFoundError, subprocess.CalledProcessError):
+                                pass
+                    finally:
+                        audio_finished.set()
+                
+                # Start audio thread
+                audio_thread = threading.Thread(target=play_audio, daemon=True)
+                audio_thread.start()
+                
+                # Scroll text on OLED word by word
+                words_list = text.split()
+                delay_per_word = adjusted_duration / len(words_list) if words_list else 0
+                
+                for i in range(len(words_list)):
+                    # Show 3 words at a time on the OLED
+                    start_idx = max(0, i - 1)
+                    end_idx = min(len(words_list), i + 2)
+                    display_text = " ".join(words_list[start_idx:end_idx])
+                    
+                    try:
+                        self.oled.show_text(display_text, font_size=14, center=True)
+                    except Exception as e:
+                        print(f"OLED error: {e}")
+                        break
+                    
+                    time.sleep(delay_per_word)
+                
+                # Wait for audio to finish
+                audio_finished.wait(timeout=adjusted_duration + 2)
+                
+                # Clear OLED
                 try:
-                    # Try ffplay (from ffmpeg)
+                    self.oled.clear()
+                except:
+                    pass
+            else:
+                # No OLED, just play audio normally
+                try:
+                    # Try mpv (common on Linux)
                     subprocess.run(
-                        ["ffplay", "-nodisp", "-autoexit", "-loglevel", "quiet", speech_file],
+                        ["mpv", "--really-quiet", speech_file],
                         check=True,
                         capture_output=True
                     )
                 except (FileNotFoundError, subprocess.CalledProcessError):
                     try:
-                        # Try paplay (PulseAudio)
+                        # Try ffplay (from ffmpeg)
                         subprocess.run(
-                            ["paplay", speech_file],
+                            ["ffplay", "-nodisp", "-autoexit", "-loglevel", "quiet", speech_file],
                             check=True,
                             capture_output=True
                         )
                     except (FileNotFoundError, subprocess.CalledProcessError):
-                        print("⚠️  No audio player found (mpv, ffplay, or paplay)")
+                        try:
+                            # Try paplay (PulseAudio)
+                            subprocess.run(
+                                ["paplay", speech_file],
+                                check=True,
+                                capture_output=True
+                            )
+                        except (FileNotFoundError, subprocess.CalledProcessError):
+                            print("⚠️  No audio player found (mpv, ffplay, or paplay)")
             
             # Clean up
             try:
@@ -258,6 +477,13 @@ class SpanishEnglishTranslator:
         """Main listening loop"""
         while self.is_running:
             try:
+                # Show "Listening" on OLED
+                if self.oled:
+                    try:
+                        self.oled.show_text("LISTENING...", font_size=18, center=True)
+                    except:
+                        pass
+                
                 # Record audio with silence detection
                 audio_file = self.record_with_silence_detection()
                 
@@ -268,6 +494,13 @@ class SpanishEnglishTranslator:
                     time.sleep(0.5)
                     continue
                 
+                # Show "Transcribing" on OLED
+                if self.oled:
+                    try:
+                        self.oled.show_text("Transcribing...", font_size=16, center=True)
+                    except:
+                        pass
+                
                 print("⚙️  Transcribing...", end="\r")
                 
                 # Transcribe
@@ -275,6 +508,11 @@ class SpanishEnglishTranslator:
                 
                 if not text:
                     print("🟢 Ready for next input...   \n")
+                    if self.oled:
+                        try:
+                            self.oled.clear()
+                        except:
+                            pass
                     continue
                 
                 timestamp = datetime.now().strftime("%H:%M:%S")
@@ -288,6 +526,13 @@ class SpanishEnglishTranslator:
                     print(f"[{timestamp}] 🇪🇸 SPANISH DETECTED:")
                     print(f"  {text}")
                     print(f"  (Detected: {detected_lang})")
+                    
+                    # Show "Translating" on OLED
+                    if self.oled:
+                        try:
+                            self.oled.show_text("Translating to English...", font_size=14, center=True)
+                        except:
+                            pass
                     
                     english_translation = self.translate_to_english(text)
                     
@@ -305,6 +550,13 @@ class SpanishEnglishTranslator:
                     print(f"[{timestamp}] 🇬🇧 ENGLISH DETECTED:")
                     print(f"  {text}")
                     print(f"  (Detected: {detected_lang})")
+                    
+                    # Show "Translating" on OLED
+                    if self.oled:
+                        try:
+                            self.oled.show_text("Translating to Spanish...", font_size=14, center=True)
+                        except:
+                            pass
                     
                     spanish_translation = self.translate_to_spanish(text)
                     
@@ -338,6 +590,14 @@ class SpanishEnglishTranslator:
         print("\nPress Ctrl+C to stop\n")
         print("="*60 + "\n")
         
+        # Show initial message on OLED
+        if self.oled:
+            try:
+                self.oled.show_text("TRANSLATOR READY", font_size=16, center=True)
+                time.sleep(1)
+            except:
+                pass
+        
         try:
             self.listen_loop()
         except KeyboardInterrupt:
@@ -349,6 +609,13 @@ class SpanishEnglishTranslator:
         """Stop the translator"""
         print("\n\n🛑 Translator stopped.")
         self.is_running = False
+        
+        # Clear OLED display
+        if self.oled:
+            try:
+                self.oled.clear()
+            except:
+                pass
 
 def main():
     translator = SpanishEnglishTranslator()
