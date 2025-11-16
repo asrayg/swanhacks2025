@@ -52,7 +52,7 @@ security_units = {
     "Unit B": "4 minutes away"
 }
 
-def oled_print(text, size=9):
+def oled_print(text, size=6):
     global oled
 
     # Create blank image
@@ -70,7 +70,7 @@ def oled_print(text, size=9):
     line = ""
     lines = []
     for w in words:
-        if len(line) + len(w) < 18:
+        if len(line) + len(w) < 24:
             line += " " + w
         else:
             lines.append(line.strip())
@@ -281,7 +281,7 @@ def realtime_routing_alert(result):
         dynamic = generate_dynamic_vitals()
 
         print("✅ No routing required at this moment.")
-        oled_print(f"Vitals stable (auto-monitoring active)\nHeart Rate: {dynamic['heart_rate']}\nBlood Pressure: {dynamic['blood_pressure']}\nOxygen Level: {dynamic['oxygen']}\nRespiration: {dynamic['respiration']}\nTemperature: {dynamic['temperature']}")
+        oled_print(f"Heart Rate: {dynamic['heart_rate']}\nBlood Pressure: {dynamic['blood_pressure']}\nOxygen Level: {dynamic['oxygen']}\nRespiration: {dynamic['respiration']}\nTemperature: {dynamic['temperature']}")
         print("--------------------------------------------------")
         return
 
