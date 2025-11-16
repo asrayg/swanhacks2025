@@ -22,6 +22,7 @@ from PIL import Image, ImageDraw, ImageFont
 import threading
 from driver import OLED_1in51, OLED_WIDTH, OLED_HEIGHT
 import numpy as np
+import base64
 
 oled = None
 
@@ -620,28 +621,36 @@ Be helpful, accurate, and concise. Use provided context when available."""
             
             wav_io.seek(0)
             
-            with sr.AudioFile(wav_io) as source:
-                audio = self.recognizer.record(source)
+            # Use GPT-4o for transcription
+            audio_data_b64 = base64.b64encode(wav_io.read()).decode('utf-8')
             
-            text = self.recognizer.recognize_google(
-                audio,
-                language=language
+            response = self.client.chat.completions.create(
+                model="gpt-4o-transcribe",
+                modalities=["text"],
+                messages=[
+                    {
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "input_audio",
+                                "input_audio": {
+                                    "data": audio_data_b64,
+                                    "format": "wav"
+                                }
+                            },
+                            {
+                                "type": "text",
+                                "text": f"Transcribe this audio exactly as spoken in {language} language."
+                            }
+                        ]
+                    }
+                ]
             )
+            
+            text = response.choices[0].message.content.strip()
             
             print(f"You said: {text}")
             return text
-        
-        except sr.UnknownValueError:
-            print("Could not understand the audio.")
-            stop_animation.set()
-            anim_thread.join(timeout=0.1)
-            return None
-        
-        except sr.RequestError as e:
-            print(f"Speech recognition service error: {e}")
-            stop_animation.set()
-            anim_thread.join(timeout=0.1)
-            return None
         
         except Exception as e:
             print(f"Error during speech recognition: {e}")
