@@ -8,6 +8,12 @@ from JARVIS import create_jarvis
 from translate import SpanishEnglishTranslator
 import os
 from datetime import datetime
+import subprocess
+import sys
+
+def start_detect_process():
+    return subprocess.Popen([sys.executable, "detect.py"])
+
 
 def listen_for_wake_words(jarvis, frame_duration=2):
     """
@@ -217,5 +223,9 @@ def main():
         translator.is_running = False
 
 if __name__ == "__main__":
-    main()
+    detect_proc = start_detect_process()
 
+    try:
+        main()  
+    finally:
+        detect_proc.terminate()
