@@ -62,7 +62,7 @@ def oled_listening_animation(stop_event):
         ]
         draw.ellipse(center_bbox, fill=0)
 
-        image = image.rotate(180)
+        # image = image.rotate(180)
 
         buf = oled.getbuffer(image)
         oled.ShowImage(buf)
@@ -90,7 +90,7 @@ def oled_speaking_animation(duration=3.0, speed=0.08):
             y = int(32 + 20 * np.sin((x / 10.0) + phase))
             draw.line((x, 32, x, y), fill=0)
 
-        image = image.rotate(180)
+        # image = image.rotate(180)
 
         buf = oled.getbuffer(image)
         oled.ShowImage(buf)

@@ -137,7 +137,7 @@ class OLED_1in51:
                 x = 5
             draw.text((x, y_offset), line, fill="black", font=font)
             y_offset += font_size + 4
-        img = img.rotate(180)
+        # img = img.rotate(180)
  
         buf = self.getbuffer(img)
         self.show_image(buf)
