@@ -14,7 +14,6 @@ import random
 import subprocess
 from supabase import create_client, Client
 from PIL import Image, ImageDraw, ImageFont
-from driver import OLED_1in51   # if driver.py is your screen driver
 from driver import OLED_1in51, OLED_WIDTH, OLED_HEIGHT
 import numpy as np
 
@@ -229,19 +228,19 @@ def realtime_routing_alert(result):
     # 🚨 SECURITY RESPONSE
     # ---------------------------------------------------------
     if routing == "security":
-        oled_print("🚨 SECURITY DISPATCHED:")
+        oled_print("SECURITY DISPATCHED:")
         for unit, eta in security_units.items():
-            oled_print(f"   • {unit} → ETA {eta}")
+            oled_print(f"    {unit}  ETA {eta}")
         print("--------------------------------------------------")
         return
 
     if routing == "emergency":
-        oled_print("🚑 EMERGENCY RESPONSE ACTIVATED:")
-        oled_print("   • Notifying all security units:")
+        oled_print("EMERGENCY RESPONSE ACTIVATED:")
+        oled_print("    Notifying all security units:")
         for unit, eta in security_units.items():
-            oled_print(f"       - {unit} → ETA {eta}")
+            oled_print(f"       - {unit}  ETA {eta}")
         name, eta = doctors_available["emergency"]
-        oled_print(f"   • Paging ER Doctor: {name} → ETA {eta} minutes")
+        oled_print(f"    Paging ER Doctor: {name}  ETA {eta} minutes")
         print("--------------------------------------------------")
         return
 
@@ -250,25 +249,25 @@ def realtime_routing_alert(result):
     # ---------------------------------------------------------
     if routing == "doctor":
         name, eta = doctors_available["general"]
-        oled_print("👨‍⚕️ DOCTOR PAGED:")
-        oled_print(f"   • {name} → ETA {eta} minutes")
-        oled_print(f"   • Issue: {issue}")
+        oled_print("DOCTOR PAGED:")
+        oled_print(f"   {name}  ETA {eta} minutes")
+        oled_print(f"   Issue: {issue}")
         print("--------------------------------------------------")
         return
 
     if routing == "allergy":
         name, eta = doctors_available["allergy"]
-        oled_print("🌰 ALLERGY SPECIALIST PAGED:")
-        oled_print(f"   • {name} → ETA {eta} minutes")
-        oled_print(f"   • Trigger: {issue}")
+        oled_print("ALLERGY SPECIALIST PAGED:")
+        oled_print(f"    {name}  ETA {eta} minutes")
+        oled_print(f"    Trigger: {issue}")
         print("--------------------------------------------------")
         return
 
     if routing == "injury":
         name, eta = doctors_available["injury"]
-        oled_print("🩹 TRAUMA/INJURY PHYSICIAN PAGED:")
-        oled_print(f"   • {name} → ETA {eta} minutes")
-        oled_print(f"   • Issue: {issue}")
+        oled_print("TRAUMA/INJURY PHYSICIAN PAGED:")
+        oled_print(f"    {name}  ETA {eta} minutes")
+        oled_print(f"    Issue: {issue}")
         print("--------------------------------------------------")
         return
 
@@ -279,15 +278,15 @@ def realtime_routing_alert(result):
         dynamic = generate_dynamic_vitals()
 
         print("✅ No routing required at this moment.")
-        oled_print("   • Vitals stable (auto-monitoring active)")
-        oled_print(f"   • Heart Rate:       {dynamic['heart_rate']}")
-        oled_print(f"   • Blood Pressure:   {dynamic['blood_pressure']}")
-        oled_print(f"   • Oxygen Level:     {dynamic['oxygen']}")
-        oled_print(f"   • Respiration:      {dynamic['respiration']}")
-        oled_print(f"   • Temperature:      {dynamic['temperature']}")
-        oled_print("   • No aggression detected.")
-        oled_print("   • No medical issues detected.")
-        oled_print("   • Continuing normal monitoring...")
+        oled_print("    Vitals stable (auto-monitoring active)")
+        oled_print(f"   Heart Rate:       {dynamic['heart_rate']}")
+        oled_print(f"   Blood Pressure:   {dynamic['blood_pressure']}")
+        oled_print(f"   Oxygen Level:     {dynamic['oxygen']}")
+        oled_print(f"   Respiration:      {dynamic['respiration']}")
+        oled_print(f"   Temperature:      {dynamic['temperature']}")
+        oled_print("   No aggression detected.")
+        oled_print("   No medical issues detected.")
+        oled_print("   Continuing normal monitoring...")
         print("--------------------------------------------------")
         return
 
@@ -629,8 +628,8 @@ def main():
                 if text:
                     audio_context.append(text)
                     if detect_shutdown_command(text):
-                        oled_print("\n🛑 Voice shutdown command detected!")
-                        oled_print("   → Ending session safely...\n")
+                        oled_print("\nVoice shutdown command detected!")
+                        oled_print("    Ending session safely...\n")
                         break
                     issue = detect_audio_keywords(text)
                     if issue:
