@@ -9,6 +9,7 @@ from datetime import datetime
 import tempfile
 import subprocess
 import threading
+import base64
 
 # OLED imports
 try:
@@ -151,6 +152,15 @@ class OLED_1in51:
 
 
 class SpanishEnglishTranslator:
+    """
+    Real-time Spanish-English bidirectional translator.
+    
+    SUPPORTED LANGUAGES: ENGLISH and SPANISH ONLY
+    - Uses GPT-4o audio for speech transcription and language detection
+    - Uses GPT-4o-mini for translation
+    - Uses OpenAI TTS for speech synthesis
+    - Any other language detected will be mapped to either English or Spanish
+    """
     def __init__(self, silence_threshold=None, auto_calibrate=False, use_oled=True):
         self.is_running = False
         self.sample_rate = 16000
@@ -256,22 +266,64 @@ class SpanishEnglishTranslator:
         return temp_filename
     
     def transcribe_audio(self, audio_file):
-        """Transcribe audio and detect language"""
+        """Transcribe audio using GPT-4o and detect language"""
         try:
+            # Read and encode audio file as base64
             with open(audio_file, "rb") as f:
-                transcript = client.audio.transcriptions.create(
-                    model="whisper-1",
-                    file=f,
-                    response_format="verbose_json"
-                )
+                audio_data = base64.b64encode(f.read()).decode('utf-8')
             
-            text = transcript.text.strip()
-            language = transcript.language
+            # Use GPT-4o with audio input for transcription
+            response = client.chat.completions.create(
+                model="gpt-4o-audio-preview",
+                modalities=["text"],
+                audio={"voice": "alloy", "format": "wav"},
+                messages=[
+                    {
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "input_audio",
+                                "input_audio": {
+                                    "data": audio_data,
+                                    "format": "wav"
+                                }
+                            },
+                            {
+                                "type": "text",
+                                "text": "Transcribe this audio exactly as spoken. Also identify if the language is English ('en') or Spanish ('es'). Respond in this format: LANGUAGE: [en or es]\nTRANSCRIPT: [exact transcription]"
+                            }
+                        ]
+                    }
+                ]
+            )
+            
+            # Parse the response
+            full_response = response.choices[0].message.content.strip()
+            
+            # Extract language and transcript
+            lines = full_response.split('\n')
+            language = None
+            text = None
+            
+            for line in lines:
+                if line.startswith('LANGUAGE:'):
+                    lang_code = line.replace('LANGUAGE:', '').strip().lower()
+                    language = lang_code if lang_code in ['en', 'es'] else None
+                elif line.startswith('TRANSCRIPT:'):
+                    text = line.replace('TRANSCRIPT:', '').strip()
+            
+            # If parsing failed, try to use the whole response as text
+            if not text:
+                text = full_response
+            
+            # Default to English if language not detected
+            if not language:
+                language = 'en'
             
             return text, language
             
         except Exception as e:
-            print(f"❌ Error in transcription: {e}")
+            print(f"❌ Error in GPT-4o transcription: {e}")
             return None, None
         finally:
             # Clean up temp file
@@ -283,32 +335,41 @@ class SpanishEnglishTranslator:
     def detect_language(self, text, detected_lang):
         """
         Determine the language of the text.
+        Only supports English and Spanish - maps everything to one of these two.
         Returns: 'spanish' or 'english'
         """
-        # Primary: Trust Whisper's language detection
+        # Primary: Trust GPT-4o's language detection for Spanish/English
         if detected_lang:
-            if detected_lang == "es":
+            # Spanish
+            if detected_lang in ["es", "spanish"]:
                 return "spanish"
-            elif detected_lang == "en":
+            # English
+            elif detected_lang in ["en", "english"]:
                 return "english"
+            else:
+                # Other languages detected - need to determine which to map to
+                print(f"⚠️  Detected language '{detected_lang}' not supported. Mapping to English or Spanish...")
         
         # Fallback: Check for Spanish-specific indicators
         spanish_chars = ['ñ', 'á', 'é', 'í', 'ó', 'ú', '¿', '¡']
         if any(char in text.lower() for char in spanish_chars):
+            print("🔍 Spanish character detected, treating as Spanish")
             return "spanish"
         
         # Common Spanish words
         spanish_words = ['hola', 'gracias', 'por favor', 'buenos', 'días',
                         'cómo', 'qué', 'dónde', 'está', 'soy', 'muy',
-                        'bien', 'señor', 'señora', 'buenas', 'noches']
+                        'bien', 'señor', 'señora', 'buenas', 'noches', 'como']
         text_lower = text.lower()
         spanish_word_count = sum(1 for word in spanish_words if word in text_lower)
         
         # If multiple Spanish words found, it's likely Spanish
         if spanish_word_count >= 2:
+            print(f"🔍 {spanish_word_count} Spanish words detected, treating as Spanish")
             return "spanish"
         
         # Default to English if unclear
+        print("🔍 Defaulting to English")
         return "english"
     
     def translate_to_english(self, spanish_text):
@@ -319,7 +380,7 @@ class SpanishEnglishTranslator:
                 messages=[
                     {
                         "role": "system",
-                        "content": "You are a Spanish to English translator. Translate the following Spanish text to English. Only provide the translation, no explanations."
+                        "content": "You are a Spanish to English translator. You ONLY translate from Spanish to English. If the text is already in English or in any other language, translate it to English anyway. Provide only the translation, no explanations."
                     },
                     {
                         "role": "user",
@@ -340,7 +401,7 @@ class SpanishEnglishTranslator:
                 messages=[
                     {
                         "role": "system",
-                        "content": "You are an English to Spanish translator. Translate the following English text to Spanish. Only provide the translation, no explanations."
+                        "content": "You are an English to Spanish translator. You ONLY translate from English to Spanish. If the text is already in Spanish or in any other language, translate it to Spanish anyway. Provide only the translation, no explanations."
                     },
                     {
                         "role": "user",
@@ -520,31 +581,7 @@ class SpanishEnglishTranslator:
                 # Detect language and translate accordingly
                 language = self.detect_language(text, detected_lang)
                 
-                if language == "spanish":
-                    # Spanish → English
-                    print(f"\n{'='*60}")
-                    print(f"[{timestamp}] 🇪🇸 SPANISH DETECTED:")
-                    print(f"  {text}")
-                    print(f"  (Detected: {detected_lang})")
-                    
-                    # Show "Translating" on OLED
-                    if self.oled:
-                        try:
-                            self.oled.show_text("Translating to English...", font_size=14, center=True)
-                        except:
-                            pass
-                    
-                    english_translation = self.translate_to_english(text)
-                    
-                    if english_translation:
-                        print(f"\n[{timestamp}] 🇬🇧 ENGLISH TRANSLATION:")
-                        print(f"  {english_translation}")
-                        print(f"\n🔊 Speaking in English...")
-                        self.speak_text(english_translation)
-                        print(f"✅ TTS completed")
-                    print(f"{'='*60}")
-                    
-                else:  # English
+                if language == "english":
                     # English → Spanish
                     print(f"\n{'='*60}")
                     print(f"[{timestamp}] 🇬🇧 ENGLISH DETECTED:")
@@ -569,6 +606,31 @@ class SpanishEnglishTranslator:
                         print(f"✅ TTS completed")
                     print(f"{'='*60}")
                 
+                   
+                    
+                else:  # English
+                    # Spanish → English
+                    print(f"\n{'='*60}")
+                    print(f"[{timestamp}] 🇪🇸 SPANISH DETECTED:")
+                    print(f"  {text}")
+                    print(f"  (Detected: {detected_lang})")
+                    
+                    # Show "Translating" on OLED
+                    if self.oled:
+                        try:
+                            self.oled.show_text("Translating to English...", font_size=14, center=True)
+                        except:
+                            pass
+                    
+                    english_translation = self.translate_to_english(text)
+                    
+                    if english_translation:
+                        print(f"\n[{timestamp}] 🇬🇧 ENGLISH TRANSLATION:")
+                        print(f"  {english_translation}")
+                        print(f"\n🔊 Speaking in English...")
+                        self.speak_text(english_translation)
+                        print(f"✅ TTS completed")
+                    print(f"{'='*60}")
             except KeyboardInterrupt:
                 break
             except Exception as e:
@@ -582,8 +644,10 @@ class SpanishEnglishTranslator:
         print("\n" + "="*60)
         print("🇪🇸 ↔️ 🇬🇧 SPANISH-ENGLISH LIVE TRANSLATOR")
         print("="*60)
+        print("\nPowered by GPT-4o Audio")
+        print("Supported Languages: ENGLISH and SPANISH ONLY")
         print("\nHow it works:")
-        print("  • Automatically detects Spanish or English")
+        print("  • GPT-4o transcribes audio and detects language")
         print("  • Spanish → English translation + TTS")
         print("  • English → Spanish translation + TTS")
         print("  • Automatic silence detection (stops after 1.5s)")
