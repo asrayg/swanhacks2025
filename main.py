@@ -231,6 +231,16 @@ def main():
                             'end translation',
                             'stop translating',
                             'end translating'
+                            'stop',
+                            'end',
+                            'exit',
+                            'quit',
+                            'cancel',
+                            'stop all',
+                            'end all',
+                            'exit all',
+                            'quit all',
+                            'translat'
                         ]
                         if any(phrase in text_lower for phrase in exit_phrases):
                             print("\n🛑 Exit command detected. Leaving translator mode...\n")
