@@ -97,13 +97,14 @@ class AudioRecorder:
         return True
     
 def capture_frame(path="/dev/shm/frame.jpg"):
-    """Capture a single frame using rpicam-still."""
+    """Capture a single frame using rpicam-still with no preview (headless-safe)."""
     cmd = [
         "rpicam-still",
-        "-t", "1",               # no preview wait
+        "--nopreview",        # fully disables preview pipeline
+        "--immediate",        # no display warmup
+        "-t", "1",
         "--width", "640",
         "--height", "480",
-        "-n",                   # no preview window
         "-o", path
     ]
     subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
