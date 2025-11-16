@@ -12,7 +12,7 @@ import threading
 import re
 import random
 import subprocess
-import supabase
+from supabase import create_client, Client
 
 load_dotenv()
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
