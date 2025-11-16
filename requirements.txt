@@ -28,6 +28,7 @@ sounddevice>=0.4.6  # Modern alternative to PyAudio, works better with virtual d
 supervision
 openai
 opencv-python
+opencv-contrib-python  # Required for LBPH face recognition (cv2.face module)
 numpy
 requests
 gradio==3.50.2
