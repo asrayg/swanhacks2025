@@ -31,8 +31,8 @@ def capture_frame(path="/dev/shm/frame.jpg"):
 
 load_dotenv()
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-oled = OLED_1in51()
-oled.Init()
+# oled = OLED_1in51()
+# oled.Init()
 
 # -----------------------------
 # SUPABASE CONFIGURATION
@@ -170,18 +170,20 @@ def realtime_routing_alert(result):
     # 🚨 SECURITY RESPONSE
     # ---------------------------------------------------------
     if routing == "security":
-        oled_print(oled, "SECURITY 🚨")
+        # oled_print(oled, "SECURITY 🚨")
+        print("SECURITY 🚨")
         for unit, eta in security_units.items():
-            oled_print(oled,f"   • {unit} → ETA {eta}")
+            # oled_print(oled,f"   • {unit} → ETA {eta}")
+            print("  • {unit} → ETA {eta}")
         return
 
     if routing == "emergency":
-        oled_print(oled,"🚑 EMERGENCY RESPONSE ACTIVATED:")
-        oled_print(oled,"   • Notifying all security units:")
-        for unit, eta in security_units.items():
-            oled_print(oled,f"       - {unit} → ETA {eta}")
-        name, eta = doctors_available["emergency"]
-        oled_print(oled,f"   • Paging ER Doctor: {name} → ETA {eta} minutes")
+        # oled_print(oled,"🚑 EMERGENCY RESPONSE ACTIVATED:")
+        # oled_print(oled,"   • Notifying all security units:")
+        # for unit, eta in security_units.items():
+        #     oled_print(oled,f"       - {unit} → ETA {eta}")
+        # name, eta = doctors_available["emergency"]
+        # oled_print(oled,f"   • Paging ER Doctor: {name} → ETA {eta} minutes")
         return
 
     # ---------------------------------------------------------
@@ -189,23 +191,23 @@ def realtime_routing_alert(result):
     # ---------------------------------------------------------
     if routing == "doctor":
         name, eta = doctors_available["general"]
-        oled_print(oled,"👨‍⚕️ DOCTOR PAGED:")
-        oled_print(oled,f"   • {name} → ETA {eta} minutes")
-        oled_print(oled,f"   • Issue: {issue}")
+        # oled_print(oled,"👨‍⚕️ DOCTOR PAGED:")
+        # oled_print(oled,f"   • {name} → ETA {eta} minutes")
+        # oled_print(oled,f"   • Issue: {issue}")
         return
 
     if routing == "allergy":
         name, eta = doctors_available["allergy"]
-        oled_print(oled,"🌰 ALLERGY SPECIALIST PAGED:")
-        oled_print(oled,f"   • {name} → ETA {eta} minutes")
-        oled_print(oled,f"   • Trigger: {issue}")
+        # oled_print(oled,"🌰 ALLERGY SPECIALIST PAGED:")
+        # oled_print(oled,f"   • {name} → ETA {eta} minutes")
+        # oled_print(oled,f"   • Trigger: {issue}")
         return
 
     if routing == "injury":
         name, eta = doctors_available["injury"]
-        oled_print(oled,"🩹 TRAUMA/INJURY PHYSICIAN PAGED:")
-        oled_print(oled,f"   • {name} → ETA {eta} minutes")
-        oled_print(oled,f"   • Issue: {issue}")
+        # oled_print(oled,"🩹 TRAUMA/INJURY PHYSICIAN PAGED:")
+        # oled_print(oled,f"   • {name} → ETA {eta} minutes")
+        # oled_print(oled,f"   • Issue: {issue}")
         return
 
     # ---------------------------------------------------------
@@ -214,15 +216,15 @@ def realtime_routing_alert(result):
     if routing == "none":
         dynamic = generate_dynamic_vitals()
 
-        oled_print(oled,"   • Vitals stable (auto-monitoring active)")
-        oled_print(oled,f"   • Heart Rate:       {dynamic['heart_rate']}")
-        oled_print(oled,f"   • Blood Pressure:   {dynamic['blood_pressure']}")
-        oled_print(oled,f"   • Oxygen Level:     {dynamic['oxygen']}")
-        oled_print(oled,f"   • Respiration:      {dynamic['respiration']}")
-        oled_print(oled,f"   • Temperature:      {dynamic['temperature']}")
-        oled_print(oled,"   • No aggression detected.")
-        oled_print(oled,"   • No medical issues detected.")
-        oled_print(oled,"   • Continuing normal monitoring...")
+        # oled_print(oled,"   • Vitals stable (auto-monitoring active)")
+        # oled_print(oled,f"   • Heart Rate:       {dynamic['heart_rate']}")
+        # oled_print(oled,f"   • Blood Pressure:   {dynamic['blood_pressure']}")
+        # oled_print(oled,f"   • Oxygen Level:     {dynamic['oxygen']}")
+        # oled_print(oled,f"   • Respiration:      {dynamic['respiration']}")
+        # oled_print(oled,f"   • Temperature:      {dynamic['temperature']}")
+        # oled_print(oled,"   • No aggression detected.")
+        # oled_print(oled,"   • No medical issues detected.")
+        # oled_print(oled,"   • Continuing normal monitoring...")
         return
 
 # -----------------------------
