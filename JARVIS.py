@@ -62,7 +62,7 @@ def oled_listening_animation(stop_event):
         ]
         draw.ellipse(center_bbox, fill=0)
 
-        # image = image.rotate(180)
+        image = image.rotate(180)
 
         buf = oled.getbuffer(image)
         oled.ShowImage(buf)

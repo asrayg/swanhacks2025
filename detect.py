@@ -82,7 +82,7 @@ def oled_print(text, size=9):
         draw.text((0, y), ln, font=font, fill=0)
         y += size + 3
 
-    # image = image.rotate(180)
+    image = image.rotate(180)
 
     buf = oled.getbuffer(image)
     oled.ShowImage(buf)
