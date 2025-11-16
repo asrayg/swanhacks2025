@@ -8,9 +8,164 @@ import os
 from datetime import datetime
 import tempfile
 import subprocess
+import threading
+
+# OLED Display imports
+try:
+    import board
+    import digitalio
+    import busio
+    from PIL import Image, ImageDraw, ImageFont
+    OLED_AVAILABLE = True
+except ImportError:
+    OLED_AVAILABLE = False
+    print("⚠️ OLED libraries not available. Display features disabled.")
 
 load_dotenv()
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
+# OLED Constants
+OLED_WIDTH = 128
+OLED_HEIGHT = 64
+
+
+class OLED_1in51:
+    """OLED Display controller for 128x64 SSD1306-based displays"""
+    
+    def __init__(self):
+        if not OLED_AVAILABLE:
+            raise RuntimeError("OLED libraries not available")
+        
+        # SPI
+        self.spi = busio.SPI(board.SCLK, MOSI=board.MOSI)
+        
+        # Pins
+        self.dc = digitalio.DigitalInOut(board.D24)
+        self.rst = digitalio.DigitalInOut(board.D25)
+        self.cs = digitalio.DigitalInOut(board.D8)
+        for pin in [self.dc, self.rst, self.cs]:
+            pin.direction = digitalio.Direction.OUTPUT
+        
+        # Configure SPI
+        while not self.spi.try_lock():
+            pass
+        self.spi.configure(baudrate=8000000, phase=0, polarity=0)
+        self.spi.unlock()
+        
+        self.width = OLED_WIDTH
+        self.height = OLED_HEIGHT
+        
+        print("✅ OLED Display initialized")
+    
+    def command(self, cmd):
+        """Send command to OLED"""
+        self.dc.value = 0
+        self.cs.value = 0
+        self.spi.write(bytes([cmd]))
+        self.cs.value = 1
+    
+    def data(self, data):
+        """Send data to OLED"""
+        self.dc.value = 1
+        self.cs.value = 0
+        self.spi.write(data)
+        self.cs.value = 1
+    
+    def reset(self):
+        """Hardware reset of OLED"""
+        self.rst.value = 0
+        time.sleep(0.2)
+        self.rst.value = 1
+        time.sleep(0.2)
+    
+    def init(self):
+        """Initialize OLED with standard SSD1306 commands"""
+        self.reset()
+        cmds = [
+            0xAE,  # Display OFF
+            0xD5, 0xA0,  # Set display clock
+            0xA8, 0x3F,  # Set multiplex ratio
+            0xD3, 0x00,  # Set display offset
+            0x40,  # Set start line
+            0xA1,  # Set segment remap
+            0xC8,  # Set COM scan direction
+            0xDA, 0x12,  # Set COM pins
+            0x81, 0x7F,  # Set contrast
+            0xA4,  # Display follows RAM
+            0xA6,  # Normal display (not inverted)
+            0xD9, 0xF1,  # Set pre-charge period
+            0xDB, 0x40,  # Set VCOMH deselect level
+            0xAF  # Display ON
+        ]
+        for c in cmds:
+            self.command(c)
+    
+    def getbuffer(self, image):
+        """Convert PIL image to OLED buffer format"""
+        buf = [0x00] * (self.width * self.height // 8)
+        img = image.convert("1")
+        pixels = img.load()
+        for y in range(self.height):
+            for x in range(self.width):
+                if pixels[x, y] == 0:
+                    buf[x + (y // 8) * self.width] |= (1 << (y % 8))
+        return buf
+    
+    def show_image(self, buf):
+        """Display buffer on OLED"""
+        for page in range(8):
+            self.command(0xB0 + page)  # Set page address
+            self.command(0x00)  # Set lower column address
+            self.command(0x10)  # Set higher column address
+            start = page * 128
+            end = start + 128
+            self.data(bytes(buf[start:end]))
+    
+    def clear(self):
+        """Clear the display"""
+        img = Image.new("1", (self.width, self.height), "white")
+        buf = self.getbuffer(img)
+        self.show_image(buf)
+    
+    def scroll_text(self, text, font_size=16, scroll_speed=0.05):
+        """
+        Scroll text horizontally across the display.
+        
+        Args:
+            text: Text to display
+            font_size: Font size in pixels
+            scroll_speed: Delay between scroll steps (seconds)
+        """
+        try:
+            # Try to load a nice font
+            font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", font_size)
+        except:
+            # Fall back to default font
+            font = ImageFont.load_default()
+        
+        # Create a temporary image to measure text width
+        temp_img = Image.new("1", (1, 1), "white")
+        temp_draw = ImageDraw.Draw(temp_img)
+        bbox = temp_draw.textbbox((0, 0), text, font=font)
+        text_width = bbox[2] - bbox[0]
+        text_height = bbox[3] - bbox[1]
+        
+        # Calculate vertical centering
+        y_pos = (self.height - text_height) // 2
+        
+        # Scroll from right to left
+        for x_offset in range(self.width, -text_width - 10, -2):
+            img = Image.new("1", (self.width, self.height), "white")
+            draw = ImageDraw.Draw(img)
+            draw.text((x_offset, y_pos), text, fill="black", font=font)
+            
+            buf = self.getbuffer(img)
+            self.show_image(buf)
+            time.sleep(scroll_speed)
+        
+        # Clear display after scrolling
+        self.clear()
+
 
 class SpanishEnglishTranslator:
     def __init__(self):
@@ -19,6 +174,20 @@ class SpanishEnglishTranslator:
         self.channels = 1
         self.silence_threshold = 1500  # Energy threshold for silence
         self.silence_duration = 1.5  # Seconds of silence before stopping
+        
+        # Initialize OLED display if available
+        self.oled = None
+        if OLED_AVAILABLE:
+            try:
+                self.oled = OLED_1in51()
+                self.oled.init()
+                self.oled.clear()
+                print("📺 OLED Display ready for translations")
+            except Exception as e:
+                print(f"⚠️ Could not initialize OLED: {e}")
+                self.oled = None
+        else:
+            print("ℹ️ Running without OLED display")
         
     def record_with_silence_detection(self, max_duration=30):
         """Record audio until silence is detected"""
@@ -155,10 +324,30 @@ class SpanishEnglishTranslator:
                     }
                 ]
             )
-            return translation.choices[0].message.content.strip()
+            english_text = translation.choices[0].message.content.strip()
+            
+            # Display on OLED if available (in background thread)
+            if self.oled:
+                display_thread = threading.Thread(
+                    target=self._display_translation,
+                    args=(english_text,),
+                    daemon=True
+                )
+                display_thread.start()
+            
+            return english_text
         except Exception as e:
             print(f"❌ Error in Spanish→English translation: {e}")
             return None
+    
+    def _display_translation(self, text):
+        """Display translation on OLED screen (runs in background thread)"""
+        try:
+            if self.oled:
+                print("📺 Displaying on OLED...")
+                self.oled.scroll_text(text, font_size=18, scroll_speed=0.03)
+        except Exception as e:
+            print(f"⚠️ Error displaying on OLED: {e}")
     
     def translate_to_spanish(self, english_text):
         """Translate English to Spanish"""

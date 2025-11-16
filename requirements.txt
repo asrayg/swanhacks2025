@@ -25,6 +25,11 @@ sounddevice>=0.4.6  # Modern alternative to PyAudio, works better with virtual d
 # - ffmpeg: sudo pacman -S ffmpeg
 # - pulseaudio: sudo pacman -S pulseaudio
 
+# OLED Display (for scrolling text on hardware display)
+Pillow>=10.0.0
+Adafruit-Blinka>=8.0.0  # For board, digitalio, busio modules
+# Note: May require system libraries: python-spidev, libgpiod
+
 supervision
 openai
 opencv-python
