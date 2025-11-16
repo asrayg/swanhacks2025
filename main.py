@@ -28,12 +28,12 @@ def listen_for_wake_words(jarvis, frame_duration=2):
         None if no wake word detected
     """
     text = jarvis.listen_continuous(frame_duration=frame_duration, language="en-US")
-    
+    print(text)
     if text:
         text_lower = text.lower()
-        if "jeff" in text_lower:
+        if text_lower.contains("jeff"):
             return "jeff"
-        elif "translate" in text_lower:
+        elif text_lower.contains("translate"):
             return "translate"
     
     return None
