@@ -247,7 +247,7 @@ def realtime_routing_alert(result):
     aggro = result.get("aggression", False)
     level = result.get("aggression_level", 0)
 
-    print("\n📡 ROUTING STATUS UPDATE ---------------------------")
+    # print("\n📡 ROUTING STATUS UPDATE ---------------------------")
 
     # ---------------------------------------------------------
     # 🚨 SECURITY RESPONSE
@@ -295,7 +295,7 @@ def realtime_routing_alert(result):
     if routing == "none":
         dynamic = generate_dynamic_vitals()
 
-        print("✅ No routing required at this moment.")
+        # print("✅ No routing required at this moment.")
         oled_print(f"Heart Rate: {dynamic['heart_rate']}\nBlood Pressure: {dynamic['blood_pressure']}\nOxygen Level: {dynamic['oxygen']}\nRespiration: {dynamic['respiration']}\nTemperature: {dynamic['temperature']}")
         print("--------------------------------------------------")
         return
@@ -666,8 +666,8 @@ def main():
                 if len(visual_context) > 10:
                     visual_context.pop(0)
 
-                print("\n--- FRAME EVENT ---")
-                print(result)
+                # print("\n--- FRAME EVENT ---")
+                # print(result)
                 realtime_routing_alert(result)
                 last_frame_time = now
 
