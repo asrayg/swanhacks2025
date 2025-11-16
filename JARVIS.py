@@ -11,7 +11,6 @@ from openai import OpenAI
 import chromadb
 from chromadb.config import Settings
 import PyPDF2
-import speech_recognition as sr
 import sounddevice as sd
 import numpy as np
 import io
@@ -152,7 +151,6 @@ class JARVIS:
         self.context_chunks = []
         self.large_context = ""
         
-        self.recognizer = sr.Recognizer()
         self.mic_device_index = None
         self.mic_device = None
         self.silence_threshold = 3000  
@@ -349,6 +347,49 @@ Be helpful, accurate, and concise. Use provided context when available."""
             print(f"Error retrieving context: {e}")
             return []
     
+    def _transcribe_with_gpt4o(self, audio_file_path, language="en-US"):
+        """
+        Transcribe audio using GPT-4o-transcribe model
+        Args:
+            audio_file_path: Path to the WAV audio file
+            language: Language code (e.g., "en-US") - passed for compatibility but not used by GPT-4o
+        Returns:
+            Transcribed text or None if failed
+        """
+        try:
+            with open(audio_file_path, "rb") as f:
+                audio_data = base64.b64encode(f.read()).decode('utf-8')
+            
+            response = self.client.chat.completions.create(
+                model="gpt-4o-transcribe",
+                modalities=["text"],
+                messages=[
+                    {
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "input_audio",
+                                "input_audio": {
+                                    "data": audio_data,
+                                    "format": "wav"
+                                }
+                            },
+                            {
+                                "type": "text",
+                                "text": "Transcribe this audio exactly as spoken."
+                            }
+                        ]
+                    }
+                ]
+            )
+            
+            transcription = response.choices[0].message.content.strip()
+            return transcription
+            
+        except Exception as e:
+            print(f"Error in GPT-4o transcription: {e}")
+            return None
+    
     def ask(
         self,
         query,
@@ -488,31 +529,26 @@ Be helpful, accurate, and concise. Use provided context when available."""
             if audio_max < 100: 
                 print(f"Warning: Audio level very low ({audio_max}). Check microphone volume!")
             
-            wav_io = io.BytesIO()
-            with wave.open(wav_io, 'wb') as wav_file:
+            # Save audio to temporary WAV file
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as temp_file:
+                temp_filename = temp_file.name
+            
+            with wave.open(temp_filename, 'wb') as wav_file:
                 wav_file.setnchannels(1)
                 wav_file.setsampwidth(2) 
                 wav_file.setframerate(sample_rate)
                 wav_file.writeframes(audio_data.tobytes())
             
-            wav_io.seek(0)
+            # Transcribe using GPT-4o
+            text = self._transcribe_with_gpt4o(temp_filename, language)
             
-            with sr.AudioFile(wav_io) as source:
-                audio = self.recognizer.record(source)
-            
-            text = self.recognizer.recognize_google(
-                audio,
-                language=language
-            )
+            # Clean up temp file
+            try:
+                os.remove(temp_filename)
+            except:
+                pass
             
             return text
-        
-        except sr.UnknownValueError:
-            return None
-        
-        except sr.RequestError as e:
-            print(f"Google API request failed: {e}")
-            return None
         
         except Exception as e:
             print(f"Recognition error: {e}")
@@ -612,45 +648,31 @@ Be helpful, accurate, and concise. Use provided context when available."""
             
             audio_data = np.concatenate(all_audio_chunks, axis=0)
             
-            wav_io = io.BytesIO()
-            with wave.open(wav_io, 'wb') as wav_file:
+            # Save audio to temporary WAV file
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as temp_file:
+                temp_filename = temp_file.name
+            
+            with wave.open(temp_filename, 'wb') as wav_file:
                 wav_file.setnchannels(1)
                 wav_file.setsampwidth(2)
                 wav_file.setframerate(sample_rate)
                 wav_file.writeframes(audio_data.tobytes())
             
-            wav_io.seek(0)
+            # Transcribe using GPT-4o
+            text = self._transcribe_with_gpt4o(temp_filename, language)
             
-            # Use GPT-4o for transcription
-            audio_data_b64 = base64.b64encode(wav_io.read()).decode('utf-8')
+            # Clean up temp file
+            try:
+                os.remove(temp_filename)
+            except:
+                pass
             
-            response = self.client.chat.completions.create(
-                model="gpt-4o-transcribe",
-                modalities=["text"],
-                messages=[
-                    {
-                        "role": "user",
-                        "content": [
-                            {
-                                "type": "input_audio",
-                                "input_audio": {
-                                    "data": audio_data_b64,
-                                    "format": "wav"
-                                }
-                            },
-                            {
-                                "type": "text",
-                                "text": f"Transcribe this audio exactly as spoken in {language} language."
-                            }
-                        ]
-                    }
-                ]
-            )
-            
-            text = response.choices[0].message.content.strip()
-            
-            print(f"You said: {text}")
-            return text
+            if text:
+                print(f"You said: {text}")
+                return text
+            else:
+                print("Could not transcribe the audio.")
+                return None
         
         except Exception as e:
             print(f"Error during speech recognition: {e}")
@@ -688,34 +710,31 @@ Be helpful, accurate, and concise. Use provided context when available."""
             
             print("Processing speech...")
             
-            wav_io = io.BytesIO()
-            with wave.open(wav_io, 'wb') as wav_file:
+            # Save audio to temporary WAV file
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as temp_file:
+                temp_filename = temp_file.name
+            
+            with wave.open(temp_filename, 'wb') as wav_file:
                 wav_file.setnchannels(1)
                 wav_file.setsampwidth(2)
                 wav_file.setframerate(sample_rate)
                 wav_file.writeframes(audio_data.tobytes())
             
-            wav_io.seek(0)
+            # Transcribe using GPT-4o
+            text = self._transcribe_with_gpt4o(temp_filename, language)
             
-            with sr.AudioFile(wav_io) as source:
-                audio = self.recognizer.record(source)
+            # Clean up temp file
+            try:
+                os.remove(temp_filename)
+            except:
+                pass
             
-            text = self.recognizer.recognize_google(
-                audio,
-                language=language,
-                show_all=show_all
-            )
-            
-            print(f"You said: {text}")
-            return text
-        
-        except sr.UnknownValueError:
-            print("Could not understand the audio.")
-            return None
-        
-        except sr.RequestError as e:
-            print(f"Speech recognition service error: {e}")
-            return None
+            if text:
+                print(f"You said: {text}")
+                return text
+            else:
+                print("Could not transcribe the audio.")
+                return None
         
         except Exception as e:
             print(f"Error during speech recognition: {e}")

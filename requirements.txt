@@ -16,8 +16,8 @@ flask>=3.0.0
 numpy>=1.24.0
 
 # Speech recognition
-SpeechRecognition>=3.10.0
-sounddevice>=0.4.6  # Modern alternative to PyAudio, works better with virtual devices
+# SpeechRecognition>=3.10.0  # No longer needed - using GPT-4o-transcribe instead
+sounddevice>=0.4.6  # For audio recording, works better with virtual devices
 # pyaudio>=0.2.13  # Note: May require system dependencies (portaudio19-dev on Linux) - REPLACED by sounddevice
 
 # Note: TTS uses OpenAI API. For audio playback, install one of:
@@ -25,11 +25,16 @@ sounddevice>=0.4.6  # Modern alternative to PyAudio, works better with virtual d
 # - ffmpeg: sudo pacman -S ffmpeg
 # - pulseaudio: sudo pacman -S pulseaudio
 
+# OLED Display (for scrolling text on hardware display)
+Pillow>=10.0.0
+Adafruit-Blinka>=8.0.0  # For board, digitalio, busio modules
+# Note: May require system libraries: python-spidev, libgpiod
+
 supervision
 openai
 opencv-python
 numpy
 requests
-gradio==3.50.2
 supabase>=2.0.0
 websockets
+pyaudio     
