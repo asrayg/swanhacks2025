@@ -12,7 +12,7 @@ import threading
 import re
 import random
 from supabase import create_client, Client
-from driver import OLED_1in51, OLED_WIDTH, OLED_HEIGHT
+# from driver import OLED_1in51, OLED_WIDTH, OLED_HEIGHT
 import subprocess
 
 # Capture frame using rpicam-still (works even without /dev/video0)
