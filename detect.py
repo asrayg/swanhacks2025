@@ -12,7 +12,6 @@ import threading
 import re
 import random
 import subprocess
-print("🔵 detect.py STARTED")
 
 load_dotenv()
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
@@ -51,51 +50,75 @@ class AudioRecorder:
     def __init__(self):
         self.frames = []
         self.is_recording = False
-        self.audio = pyaudio.PyAudio()
+        self.audio = None
+        self.stream = None
 
     def start(self):
+        print("🎤 Initializing audio...")
+        try:
+            import pyaudio
+            self.audio = pyaudio.PyAudio()
+            self.stream = self.audio.open(
+                format=pyaudio.paInt16,
+                channels=1,
+                rate=44100,
+                input=True,
+                frames_per_buffer=1024
+            )
+        except Exception as e:
+            print("❌ Mic initialization failed:", e)
+            print("➡️ Continuing WITHOUT audio.")
+            self.audio = None
+            return  # disable audio completely
+
         self.is_recording = True
-        self.stream = self.audio.open(
-            format=AUDIO_FORMAT, channels=CHANNELS,
-            rate=RATE, input=True, frames_per_buffer=CHUNK
-        )
 
         def record():
             while self.is_recording:
-                data = self.stream.read(CHUNK, exception_on_overflow=False)
+                data = self.stream.read(1024, exception_on_overflow=False)
                 self.frames.append(data)
 
         self.thread = threading.Thread(target=record)
         self.thread.start()
-        print("🎤 Audio recording started (continuous)")
+        print("🎤 Audio recording started!")
 
     def stop_and_save_full_audio(self, filename):
+        if not self.audio:
+            print("⚠️ No audio was recorded.")
+            return
+
         self.is_recording = False
         self.thread.join()
         self.stream.stop_stream()
         self.stream.close()
 
-        wf = wave.open(filename, 'wb')
-        wf.setnchannels(CHANNELS)
-        wf.setsampwidth(self.audio.get_sample_size(AUDIO_FORMAT))
-        wf.setframerate(RATE)
-        wf.writeframes(b''.join(self.frames))
-        wf.close()
+        with open(filename, "wb") as f_out:
+            wf = wave.open(f_out, 'wb')
+            wf.setnchannels(1)
+            wf.setsampwidth(self.audio.get_sample_size(AUDIO_FORMAT))
+            wf.setframerate(44100)
+            wf.writeframes(b''.join(self.frames))
 
         self.audio.terminate()
-        print(f"🎤 Full session audio saved to: {filename}")
 
     def save_chunk(self, chunk_filename):
-        num_frames = int(5 * RATE / CHUNK)
-        chunk_data = self.frames[-num_frames:] if len(self.frames) >= num_frames else self.frames
+        if not self.audio:
+            return False
 
-        wf = wave.open(chunk_filename, 'wb')
-        wf.setnchannels(CHANNELS)
-        wf.setsampwidth(self.audio.get_sample_size(AUDIO_FORMAT))
-        wf.setframerate(RATE)
-        wf.writeframes(b''.join(chunk_data))
-        wf.close()
+        num_frames = int(5 * RATE / CHUNK)
+        chunk_data = (
+            self.frames[-num_frames:] if len(self.frames) >= num_frames else self.frames
+        )
+
+        with open(chunk_filename, "wb") as f_out:
+            wf = wave.open(f_out, "wb")
+            wf.setnchannels(1)
+            wf.setsampwidth(self.audio.get_sample_size(AUDIO_FORMAT))
+            wf.setframerate(44100)
+            wf.writeframes(b"".join(chunk_data))
+
         return True
+
     
 def capture_frame(path="/dev/shm/frame.jpg"):
     """Reliable single-frame capture using rpicam-still (headless-safe)."""
@@ -561,3 +584,6 @@ def main():
     save_output(report, audio_filename, frames_collected, session_folder)
 
     print("\n✅ Session complete.")
+
+if __name__ == "__main__":
+    main()
