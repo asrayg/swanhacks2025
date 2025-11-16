@@ -11,7 +11,7 @@ import wave
 import threading
 import re
 import random
-
+import subprocess
 
 load_dotenv()
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
@@ -95,6 +95,20 @@ class AudioRecorder:
         wf.writeframes(b''.join(chunk_data))
         wf.close()
         return True
+    
+def capture_frame(path="/dev/shm/frame.jpg"):
+    """Capture a single frame using rpicam-still."""
+    cmd = [
+        "rpicam-still",
+        "-t", "1",               # no preview wait
+        "--width", "640",
+        "--height", "480",
+        "-n",                   # no preview window
+        "-o", path
+    ]
+    subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    return cv2.imread(path)
+
 
 def detect_shutdown_command(text):
     if not text:
@@ -464,10 +478,7 @@ def main():
     session_folder = f"output/session_{session_ts}"
     os.makedirs(session_folder, exist_ok=True)
 
-    cap = cv2.VideoCapture(0)
-    if not cap.isOpened():
-        print("❌ Webcam error")
-        return
+    print("📸 Using rpicam-still capture mode (no /dev/video0 required)")
 
     audio_filename = f"audio_{session_ts}.wav"
 
@@ -485,14 +496,16 @@ def main():
 
     try:
         while True:
-            ret, frame = cap.read()
-            if not ret:
+            # ---- CAPTURE FRAME FROM PI CAMERA ----
+            frame = capture_frame()
+            if frame is None:
+                print("⚠️ Frame capture failed, retrying...")
                 continue
 
             frames_collected.append(frame.copy())
             now = time.time()
 
-            # AUDIO SAMPLE EVERY 5s
+            # ---- AUDIO SAMPLE EVERY 5s ----
             if now - last_audio_time > 5:
                 chunk_file = "temp_audio.wav"
                 audio_rec.save_chunk(chunk_file)
@@ -509,7 +522,7 @@ def main():
                         print(f"🚨 AUDIO FLAG: {issue}")
                 last_audio_time = now
 
-            # FRAME ANALYSIS EVERY 1.5s
+            # ---- FRAME ANALYSIS EVERY 1.5s ----
             if now - last_frame_time > 1.5:
                 result = analyze_frame(frame)
                 result["timestamp"] = now - session_start
@@ -524,6 +537,7 @@ def main():
                 realtime_routing_alert(result)
                 last_frame_time = now
 
+            # Manual shutdown
             key = cv2.waitKey(1) & 0xFF
             if key == ord("q") or key == ord("s"):
                 print("\n🛑 Manual shutdown triggered.")
@@ -533,8 +547,6 @@ def main():
         pass
 
     print("\n🛑 Ending session...")
-    cap.release()
-    cv2.destroyAllWindows()
 
     audio_rec.stop_and_save_full_audio(audio_filename)
 
@@ -547,7 +559,3 @@ def main():
     save_output(report, audio_filename, frames_collected, session_folder)
 
     print("\n✅ Session complete.")
-
-
-if __name__ == "__main__":
-    main()
