@@ -18,6 +18,10 @@ from driver import OLED_1in51, OLED_WIDTH, OLED_HEIGHT
 import numpy as np
 oled = None
 
+# OLED control lock - set by main.py to coordinate screen access
+# When JARVIS or translator have the lock, detect should pause updates
+oled_control_lock = None
+
 load_dotenv()
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
@@ -53,7 +57,18 @@ security_units = {
 }
 
 def oled_print(text, size=6):
-    global oled
+    global oled, oled_control_lock
+    
+    # Check if JARVIS/translator has control - if so, skip update
+    if oled_control_lock is not None:
+        # Try to acquire the lock with timeout=0 (non-blocking)
+        acquired = oled_control_lock.acquire(blocking=False)
+        if not acquired:
+            # Lock is held by JARVIS or translator - skip this update
+            return
+        else:
+            # We got the lock, release it immediately and proceed
+            oled_control_lock.release()
 
     # Create blank image
     image = Image.new("1", (OLED_WIDTH, OLED_HEIGHT), 255)
@@ -90,7 +105,7 @@ def oled_print(text, size=6):
     buf = oled.getbuffer(image)
     oled.ShowImage(buf)
 
-    # Slow output so text doesn’t flicker/flash too fast
+    # Slow output so text doesn't flicker/flash too fast
     time.sleep(0.4)
 
 

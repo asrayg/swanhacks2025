@@ -15,6 +15,11 @@ import detect
 import sounddevice as sd
 import numpy as np
 
+# Global lock for OLED screen control
+# When acquired, detect should pause its screen updates
+oled_control_lock = threading.Lock()
+oled_control_owner = None  # Track who has control for debugging
+
 
 def calibrate_noise_floor(sample_rate=16000, channels=1):
     """
@@ -147,25 +152,36 @@ def main():
                 print("✅ Wake word 'Jeff' detected - JARVIS mode!")
                 print("🎤 Listening for your question...\n")
                 
-                # Generate filename with timestamp
-                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                audio_filename = f"jarvis_response_{timestamp}.mp3"
+                # Acquire OLED control - detect will pause updates
+                oled_control_lock.acquire()
+                oled_control_owner = "JARVIS"
+                print("🖥️  OLED control: JARVIS (detect paused)")
                 
-                # Now listen for the actual command with auto-stop
-                response = jarvis.listen_and_ask(
-                    auto_stop=True,           # Automatically stop when user stops talking
-                    max_duration=30,          # Maximum 30 seconds
-                    silence_duration=1.5,     # Stop after 1.5s of silence
-                    use_rag=True,             # Use RAG with clinical context
-                    speak_response=True,      # Speak the response out loud
-                    save_audio_to=audio_filename  # Save audio to file
-                )
-                
-                if response:
-                    print(f"\n🤖 JARVIS: {response}")
-                    print(f"🔊 (Response spoken and saved to {audio_filename})\n")
-                else:
-                    print("⚠️ Could not process your question. Please try again.\n")
+                try:
+                    # Generate filename with timestamp
+                    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                    audio_filename = f"jarvis_response_{timestamp}.mp3"
+                    
+                    # Now listen for the actual command with auto-stop
+                    response = jarvis.listen_and_ask(
+                        auto_stop=True,           # Automatically stop when user stops talking
+                        max_duration=30,          # Maximum 30 seconds
+                        silence_duration=1.5,     # Stop after 1.5s of silence
+                        use_rag=True,             # Use RAG with clinical context
+                        speak_response=True,      # Speak the response out loud
+                        save_audio_to=audio_filename  # Save audio to file
+                    )
+                    
+                    if response:
+                        print(f"\n🤖 JARVIS: {response}")
+                        print(f"🔊 (Response spoken and saved to {audio_filename})\n")
+                    else:
+                        print("⚠️ Could not process your question. Please try again.\n")
+                finally:
+                    # Release OLED control - detect can resume updates
+                    oled_control_owner = None
+                    oled_control_lock.release()
+                    print("🖥️  OLED control: Released (detect resumed)\n")
                 
                 print("-" * 60 + "\n")
                 frame_count = 0  # Reset frame counter after interaction
@@ -180,6 +196,11 @@ def main():
                 print("   • 'stop translation' or 'end translation'")
                 print("   • Or press Ctrl+C\n")
                 print("="*60 + "\n")
+                
+                # Acquire OLED control - detect will pause updates
+                oled_control_lock.acquire()
+                oled_control_owner = "TRANSLATOR"
+                print("🖥️  OLED control: TRANSLATOR (detect paused)\n")
                 
                 # Enter continuous translator mode
                 translator.is_running = True
@@ -259,8 +280,13 @@ def main():
                     print("\n\n🛑 Translator interrupted by user")
                 except Exception as e:
                     print(f"\n❌ Error in translator: {e}\n")
+                finally:
+                    # Release OLED control - detect can resume updates
+                    translator.is_running = False
+                    oled_control_owner = None
+                    oled_control_lock.release()
+                    print("🖥️  OLED control: Released (detect resumed)\n")
                 
-                translator.is_running = False
                 print("\n🔙 Returning to wake word detection...\n")
                 print("="*60 + "\n")
                 frame_count = 0  # Reset frame counter after translator
@@ -271,6 +297,9 @@ def main():
         translator.is_running = False
 
 if __name__ == "__main__":
+    # Set the OLED control lock in detect module so it can check it
+    detect.oled_control_lock = oled_control_lock
+    
     # Start detect in a separate thread
     detect_thread = threading.Thread(target=detect.main, daemon=True)
     detect_thread.start()
