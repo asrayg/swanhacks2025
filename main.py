@@ -49,7 +49,7 @@ def calibrate_noise_floor(sample_rate=16000, channels=1):
         
         # Set threshold as 2.5x the average background noise
         avg_noise = np.mean(calibration_samples)
-        silence_threshold = avg_noise * 2.5
+        silence_threshold = avg_noise +100
         
         print(f"✅ Noise floor: {avg_noise:.0f}")
         print(f"✅ Speech threshold: {silence_threshold:.0f}\n")
