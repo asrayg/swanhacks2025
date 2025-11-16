@@ -133,7 +133,6 @@ class JARVIS:
         api_key: Optional[str] = None,
         model: str = "gpt-5-nano",
         embedding_model: str = "text-embedding-3-small",
-        temperature: float = 0.2,
         db_path: Optional[str] = None,
         disable_telemetry: bool = True,
         tts_voice: str = "alloy",
@@ -173,7 +172,6 @@ class JARVIS:
         self.client = OpenAI(api_key=self.api_key)
         self.model = model
         self.embedding_model = embedding_model
-        self.temperature = temperature
         
         # Setup database
         self.db_path = pathlib.Path(db_path or "./jarvis_db")
@@ -523,7 +521,6 @@ Be helpful, accurate, and concise. Use provided context when available."""
             response = self.client.chat.completions.create(
                 model=self.model,
                 messages=messages,
-                temperature=self.temperature
             )
             answer = response.choices[0].message.content
             
@@ -572,7 +569,6 @@ Be helpful, accurate, and concise. Use provided context when available."""
             response = self.client.chat.completions.create(
                 model=self.model,
                 messages=messages,
-                temperature=self.temperature
             )
             return response.choices[0].message.content
         
