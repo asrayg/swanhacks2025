@@ -6,87 +6,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
-import { getReports, saveReport, ClinicalReport } from '@/utils/reports';
-
-const defaultClinicalReportContent = `======================================================================
-CLINICAL EXAMINATION REPORT
-======================================================================
-Report Generated: 2025-11-15 11:37:49
-Audio Recording: exam_audio_20251115_113704.wav
-======================================================================
-
-**Clinical Examination Report**
-
----
-
-**Patient Information:**
-
-- **Name:** [Patient Name]
-- **Age:** [Patient Age]
-- **Date of Examination:** [Examination Date]
-- **Examining Physician:** [Your Name]
-
----
-
-**1. Patient Vital Signs**
-
-- **Heart Rate:** 85 bpm (normal resting heart rate within the range of 60-100 bpm)
-- **Blood Oxygen Level:** 95% (normal range is typically 95-100%)
-- **Height:** 5'10"
-
----
-
-**2. Physical Examination Findings**
-
-Upon visual observation during the examination, the following was noted regarding the environment and patient appearance:
-
-- The patient was primarily observed in a modern indoor setting characterized by large windows, wooden elements, and well-lit spaces suggestive of contemporary architectural design. This environment included areas resembling offices, study spaces, or public indoor areas.
-  
-- The patient was frequently depicted looking downwards, often appearing focused or engaged in a task. This repeated behavior was observed in various settings suggesting a workspace or study area.
-  
-- On multiple occasions, the patient displayed a neutral and contemplative expression, suggesting engagement with a task or introspection.
-  
-- At some points, the patient was observed resting their chin on their hand, which can indicate contemplation or concentration.
-  
-- The patient's immediate environment was noted to include features such as industrial design elements, wooden paneling, and visible structural elements in the ceiling.
-
----
-
-**3. Patient Communication**
-
-The audio transcript from the examination captured the patient stating, "I quit." This brief communication may indicate a significant decision or change in the patient's current activity or situation.
-
----
-
-**4. Clinical Assessment**
-
-Based on the visual observations and patient communication, the patient appears to be in a stable physical condition with vital signs within normal limits. The patient's demeanor, expressions, and environment suggest a professional or academic setting where they may be experiencing stress, focus, or decision-making reflective in their communication of potentially leaving a current position or task.
-
----
-
-**5. Recommendations**
-
-- **Mental Health Evaluation:** Given the communication of "I quit," it may be beneficial to assess the patient's psychological well-being. Explore potential sources of stress, anxiety, or dissatisfaction in the patient's environment or activities.
-
-- **Occupational or Lifestyle Guidance:** Discuss potential changes the patient may be contemplating and provide resources or counseling as needed to support decision-making or transitions in professional or academic life.
-
-- **Follow-Up Appointment:** Schedule a follow-up appointment to monitor any developments in the patient's condition or decisions, and to provide ongoing support as required.
-
-- **Encourage Open Communication:** Provide the patient with a platform to discuss feelings and concerns honestly in future consultations, ensuring a supportive environment for addressing any issues.
-
----
-
-**Report Prepared by:**
-
-[Your Full Name, Credentials]
-
-[Your Contact Information]
-
-[Date of Report]
-
-======================================================================
-END OF REPORT
-======================================================================`;
+import { getReports, ClinicalReport } from '@/utils/reports';
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -95,42 +15,28 @@ export default function HomeScreen() {
   const [reports, setReports] = useState<ClinicalReport[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     loadReports();
-    // Auto-save the default report if no reports exist
-    initializeDefaultReport();
   }, []);
 
   async function loadReports() {
     try {
+      setError(null);
+      console.log('Loading reports...');
       const loadedReports = await getReports();
+      console.log('Loaded reports:', loadedReports.length);
       setReports(loadedReports.sort((a, b) => b.createdAt - a.createdAt));
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error loading reports:', error);
+      const errorMessage = error?.message || 'Failed to load reports. Please check your connection and try again.';
+      setError(errorMessage);
+      // Set empty array on error so user can see the empty state
+      setReports([]);
     } finally {
       setLoading(false);
       setRefreshing(false);
-    }
-  }
-
-  async function initializeDefaultReport() {
-    try {
-      const existingReports = await getReports();
-      if (existingReports.length === 0) {
-        // Save the default report
-        await saveReport({
-          date: '2025-11-15 11:37:49',
-          heartRate: 85,
-          bloodAlcohol: 95,
-          bloodPressure: '120/80',
-          height: '5\'10"',
-          content: defaultClinicalReportContent,
-        });
-        loadReports();
-      }
-    } catch (error) {
-      console.error('Error initializing default report:', error);
     }
   }
 
@@ -164,12 +70,28 @@ export default function HomeScreen() {
         <ThemedText style={styles.subtitle}>{reports.length} {reports.length === 1 ? 'Report' : 'Reports'}</ThemedText>
       </ThemedView>
 
-      {reports.length === 0 ? (
+      {error && (
+        <ThemedView style={[
+          styles.errorContainer,
+          { backgroundColor: isDark ? '#2C1810' : '#FFF5F5' }
+        ]}>
+          <IconSymbol name="exclamationmark.triangle.fill" size={48} color="#E74C3C" />
+          <ThemedText style={styles.errorText}>{error}</ThemedText>
+          <TouchableOpacity 
+            onPress={loadReports}
+            style={styles.retryButton}
+          >
+            <ThemedText style={styles.retryButtonText}>Retry</ThemedText>
+          </TouchableOpacity>
+        </ThemedView>
+      )}
+
+      {!error && reports.length === 0 ? (
         <ThemedView style={styles.emptyContainer}>
           <IconSymbol name="doc.text" size={64} color={isDark ? '#666' : '#999'} />
           <ThemedText style={styles.emptyText}>No reports yet</ThemedText>
         </ThemedView>
-      ) : (
+      ) : !error ? (
         <View style={styles.reportsList}>
           {reports.map((report) => (
             <TouchableOpacity
@@ -216,7 +138,7 @@ export default function HomeScreen() {
             </TouchableOpacity>
           ))}
         </View>
-      )}
+      ) : null}
     </ScrollView>
   );
 }
@@ -310,5 +232,31 @@ const styles = StyleSheet.create({
   reportCardVitalText: {
     fontSize: 12,
     opacity: 0.8,
+  },
+  errorContainer: {
+    marginTop: 20,
+    padding: 20,
+    borderRadius: 16,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#E74C3C',
+  },
+  errorText: {
+    marginTop: 12,
+    marginBottom: 16,
+    fontSize: 14,
+    color: '#E74C3C',
+    textAlign: 'center',
+  },
+  retryButton: {
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+    backgroundColor: '#E74C3C',
+  },
+  retryButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });

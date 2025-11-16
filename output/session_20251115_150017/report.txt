@@ -1,0 +1,50 @@
+**Incident Report**
+
+- **Date:** November 15, 2025  
+- **Session Start Time:** 03:00 PM  
+- **Location:** Unspecified indoor facility with wooden paneling and glass  
+- **Patient ID:** Not specified  
+
+**Summary:**  
+This incident report summarizes the observations and findings from a monitored session where an individual was observed over a period for potential medical or security incidents. The event was primarily recorded through a combination of video and audio monitoring. Initial observations did not indicate any aggression or immediate medical emergencies. However, subsequent frames suggested possible medical distress, leading to clinician engagement.
+
+**Patient Condition:**  
+- **Heart Rate:** 85 bpm  
+- **Oxygen Level:** 95%  
+- **Height:** 5'10"  
+Throughout the observation period, the vitals of the individual remained within normal parameters.
+
+**Aggression Analysis:**  
+Throughout the event, there were no signs of aggression. The aggression level was consistently recorded as 0 across all timestamps. The individual maintained a neutral or focused expression, indicative of engagement in a task or activity with no signs of aggression.
+
+**Medical Findings:**  
+During initial frames, the individual appeared focused and engaged in tasks, primarily looking down or at a device. As the session progressed, the expression shifted to neutral with elements of potential distress. This was confirmed in frames captured towards the latter part of the session, prompting a medical routing. The session audio transcript did not capture any verbal indicators of distress or medical concern.
+
+**Routing Decisions and Who is Called:**  
+The later frames indicated "possible distress," resulting in routing the case to a doctor. Given the absence of an explicit emergency and the stable vital signs, the priority was set for a general medical evaluation. The most accessible doctor according to the medical staffing schedule was `Dr. Lee`, the general practitioner.
+
+**Timeline:**
+- **00:00 - 118.465683 seconds:**  
+  The individual engaged in tasks without displaying signs of distress or medical emergencies.
+
+- **120.016542 seconds onwards:**  
+  Repeated frames detected potential distress, warranting medical attention. The individual maintained neutral expressions, suggesting an underlying issue.
+
+**Recommended Actions:**  
+1. **Medical Evaluation:**  
+   - Dr. Lee should perform a comprehensive assessment to determine the nature of the distress. Follow-up with specialists if required.
+   
+2. **Monitoring:**  
+   - Continue monitoring the situation via video until Dr. Lee completes their evaluation. Maintain logs of any changes in behavior or condition.
+   
+3. **Technical Review:**  
+   - Address technical issues noted in the audio transcript regarding the difficulty in stopping the program. Ensure clear operational guidelines for ease of use in future monitoring sessions.
+
+4. **Security:**  
+   - Although aggression was not observed, units should remain briefed to assist Dr. Lee, should further support be required.
+
+5. **Documentation:**  
+   - Maintain detailed logs of the individual's responses during Dr. Lee’s evaluation for further analysis and records.
+
+**Conclusion:**  
+The incident primarily involves non-critical medical observations requiring further evaluation by medical personnel. No security intervention needed at present.

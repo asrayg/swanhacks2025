@@ -7,6 +7,7 @@ import { ThemedView } from '@/components/themed-view';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
 import { getReport, ClinicalReport } from '@/utils/reports';
+import { VideoView, useVideoPlayer } from 'expo-video';
 
 export default function ReportDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -109,7 +110,32 @@ export default function ReportDetailScreen() {
           <ThemedText style={styles.reportText}>{report.content}</ThemedText>
         </ThemedView>
       </ThemedView>
+
+      {report.video && <VideoPlayer videoUrl={report.video} isDark={isDark} />}
     </ScrollView>
+  );
+}
+
+function VideoPlayer({ videoUrl, isDark }: { videoUrl: string; isDark: boolean }) {
+  const player = useVideoPlayer(videoUrl, (player) => {
+    player.loop = false;
+    // Don't auto-play - let user control playback
+  });
+
+  return (
+    <ThemedView style={styles.videoContainer}>
+      <ThemedText type="subtitle" style={styles.videoTitle}>Examination Video</ThemedText>
+      <View style={styles.videoWrapper}>
+        <VideoView
+          player={player}
+          style={styles.video}
+          allowsFullscreen
+          allowsPictureInPicture
+          contentFit="contain"
+          nativeControls
+        />
+      </View>
+    </ThemedView>
   );
 }
 
@@ -245,6 +271,27 @@ const styles = StyleSheet.create({
     fontSize: 14,
     opacity: 0.7,
     fontWeight: '600',
+  },
+  videoContainer: {
+    marginBottom: 24,
+  },
+  videoTitle: {
+    marginTop: 25,
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  videoWrapper: {
+    borderRadius: 20,
+    overflow: 'hidden',
+    backgroundColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 5,
+  },
+  video: {
+    width: '100%',
+    aspectRatio: 16 / 9,
   },
   reportContainer: {
     marginTop: 8,
