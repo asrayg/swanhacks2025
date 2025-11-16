@@ -15,18 +15,6 @@ from supabase import create_client, Client
 # from driver import OLED_1in51, OLED_WIDTH, OLED_HEIGHT
 import subprocess
 
-# Capture frame using rpicam-still (works even without /dev/video0)
-def capture_frame(path="/dev/shm/frame.jpg"):
-    cmd = [
-        "rpicam-still",
-        "-t", "1",            # no preview delay
-        "--width", "640",
-        "--height", "480",
-        "-n",                 # no preview window
-        "-o", path
-    ]
-    subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    return cv2.imread(path)
 
 
 load_dotenv()
@@ -64,63 +52,18 @@ security_units = {
 }
 
 
-# -----------------------------
-# AUDIO RECORDER (continuous)
-# -----------------------------
-AUDIO_FORMAT = pyaudio.paInt16
-CHANNELS = 1
-RATE = 44100
-CHUNK = 1024
-
-class AudioRecorder:
-    def __init__(self):
-        self.frames = []
-        self.is_recording = False
-        self.audio = pyaudio.PyAudio()
-
-    def start(self):
-        self.is_recording = True
-        self.stream = self.audio.open(
-            format=AUDIO_FORMAT, channels=CHANNELS,
-            rate=RATE, input=True, frames_per_buffer=CHUNK
-        )
-
-        def record():
-            while self.is_recording:
-                data = self.stream.read(CHUNK, exception_on_overflow=False)
-                self.frames.append(data)
-
-        self.thread = threading.Thread(target=record)
-        self.thread.start()
-        print("🎤 Audio recording started (continuous)")
-
-    def stop_and_save_full_audio(self, filename):
-        self.is_recording = False
-        self.thread.join()
-        self.stream.stop_stream()
-        self.stream.close()
-
-        wf = wave.open(filename, 'wb')
-        wf.setnchannels(CHANNELS)
-        wf.setsampwidth(self.audio.get_sample_size(AUDIO_FORMAT))
-        wf.setframerate(RATE)
-        wf.writeframes(b''.join(self.frames))
-        wf.close()
-
-        self.audio.terminate()
-        print(f"🎤 Full session audio saved to: {filename}")
-
-    def save_chunk(self, chunk_filename):
-        num_frames = int(5 * RATE / CHUNK)
-        chunk_data = self.frames[-num_frames:] if len(self.frames) >= num_frames else self.frames
-
-        wf = wave.open(chunk_filename, 'wb')
-        wf.setnchannels(CHANNELS)
-        wf.setsampwidth(self.audio.get_sample_size(AUDIO_FORMAT))
-        wf.setframerate(RATE)
-        wf.writeframes(b''.join(chunk_data))
-        wf.close()
-        return True
+# Capture frame using rpicam-still (works even without /dev/video0)
+def capture_frame(path="/dev/shm/frame.jpg"):
+    cmd = [
+        "rpicam-still",
+        "-t", "1",            # no preview delay
+        "--width", "640",
+        "--height", "480",
+        "-n",                 # no preview window
+        "-o", path
+    ]
+    subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    return cv2.imread(path)
 
 def detect_shutdown_command(text):
     if not text:
