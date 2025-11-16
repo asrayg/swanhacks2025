@@ -1,6 +1,3 @@
-#!/usr/bin/python3
-# -*- coding:utf-8 -*-
-
 import time
 import board
 import digitalio
@@ -16,10 +13,8 @@ OLED_HEIGHT = 64
 
 class OLED_1in51:
     def __init__(self):
-        # SPI
         self.spi = busio.SPI(board.SCLK, MOSI=board.MOSI)
 
-        # Pins
         self.dc = digitalio.DigitalInOut(board.D24)
         self.rst = digitalio.DigitalInOut(board.D25)
         self.cs = digitalio.DigitalInOut(board.D8)
@@ -28,7 +23,6 @@ class OLED_1in51:
         self.rst.direction = digitalio.Direction.OUTPUT
         self.cs.direction = digitalio.Direction.OUTPUT
 
-        # Configure SPI
         while not self.spi.try_lock():
             pass
         self.spi.configure(baudrate=8000000, phase=0, polarity=0)
@@ -50,7 +44,6 @@ class OLED_1in51:
         self.cs.value = 1
 
     def reset(self):
-        # ONLY ONCE — prevents flicker
         self.rst.value = 0
         time.sleep(0.05)
         self.rst.value = 1
@@ -85,13 +78,12 @@ class OLED_1in51:
 
         for y in range(self.height):
             for x in range(self.width):
-                if pixels[x, y] == 0:  # BLACK → pixel ON
+                if pixels[x, y] == 0:
                     buf[x + (y // 8) * self.width] |= (1 << (y % 8))
 
         return buf
 
     def ShowImage(self, buf):
-        # ONE TIME update — prevents blinking
         for page in range(8):
             self.command(0xB0 + page)
             self.command(0x00)
@@ -105,7 +97,6 @@ if __name__ == "__main__":
     disp = OLED_1in51()
     disp.Init()
 
-    # Create static content
     image = Image.new("1", (OLED_WIDTH, OLED_HEIGHT), "white")
     draw = ImageDraw.Draw(image)
 
@@ -113,12 +104,10 @@ if __name__ == "__main__":
 
     draw.text((20, 18), "HELLO", fill="black")
 
-    # One single draw
     buf = disp.getbuffer(image)
     disp.ShowImage(buf)
 
     logging.info("Static HELLO displayed with no blinking.")
 
-    # NO LOOP — this prevents blinking
     while True:
         time.sleep(1)

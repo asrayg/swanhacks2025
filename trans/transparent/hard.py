@@ -7,15 +7,6 @@ import digitalio
 import busio
 from PIL import Image, ImageDraw, ImageFont
 
-print("\n=== OLED DIAGNOSTIC TOOL ===")
-print("This will test:")
-print(" - SPI stability")
-print(" - Control pins (DC, RST, CS)")
-print(" - Panel power / flicker conditions")
-print(" - Pixel addressing and orientation")
-print("================================\n")
-
-
 OLED_WIDTH = 128
 OLED_HEIGHT = 64
 
@@ -92,14 +83,12 @@ class OLED_1in51:
 
 
 
-# ======== RUN TESTS ======== #
 disp = OLED_1in51()
 disp.Init()
 
 
-# TEST 1: FULL BLUE
 print("TEST 1: Filling screen with BLUE...")
-img1 = Image.new("1", (128, 64), "black")  # black → blue
+img1 = Image.new("1", (128, 64), "black") 
 buf1 = disp.getbuffer(img1)
 disp.ShowImage(buf1)
 time.sleep(2)
@@ -108,7 +97,6 @@ print(">>> Does the screen become FULL BLUE without flickering? (yes/no)")
 time.sleep(0.5)
 
 
-# TEST 2: CHECKERBOARD
 print("\nTEST 2: Checkerboard pattern...")
 img2 = Image.new("1", (128, 64), "white")
 draw2 = ImageDraw.Draw(img2)
@@ -123,7 +111,6 @@ time.sleep(2)
 print(">>> Does the checkerboard look stable? Any vertical/horizontal missing lines?")
 
 
-# TEST 3: Static HELLO
 print("\nTEST 3: Static HELLO text...")
 img3 = Image.new("1", (128, 64), "white")
 draw3 = ImageDraw.Draw(img3)

@@ -4,9 +4,6 @@ import numpy as np
 import subprocess
 import time
 
-# ============================================================
-# Raspberry Pi camera capture
-# ============================================================
 def capture_frame(path="/dev/shm/frame.jpg"):
     cmd = [
         "rpicam-still",
@@ -19,9 +16,6 @@ def capture_frame(path="/dev/shm/frame.jpg"):
     subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     return cv2.imread(path)
 
-# ============================================================
-# 1. Load Known Faces
-# ============================================================
 
 rahul_image = face_recognition.load_image_file("Rahul.png")
 rahul_face_encoding = face_recognition.face_encodings(rahul_image)[0]
@@ -35,7 +29,6 @@ arjun_face_encoding = face_recognition.face_encodings(arjun_image)[0]
 asray_image = face_recognition.load_image_file("Asray.png")
 asray_face_encoding = face_recognition.face_encodings(asray_image)[0]
 
-# FIXED — your Mitra encoding was broken
 mitra_image = face_recognition.load_image_file("Mitra.png")
 mitra_face_encoding = face_recognition.face_encodings(mitra_image)[0]
 
@@ -54,10 +47,6 @@ known_face_names = [
     "Asray",
     "Mitra"
 ]
-
-# ============================================================
-# Live Loop (using Pi camera captures)
-# ============================================================
 
 face_locations = []
 face_encodings = []

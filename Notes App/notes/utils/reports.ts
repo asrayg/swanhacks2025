@@ -12,7 +12,6 @@ export interface ClinicalReport {
   createdAt: number;
 }
 
-// Helper function to extract date from content or use current date
 function extractDateFromContent(content: string): string {
   const dateMatch = content.match(/Report Generated: ([\d\s:-]+)/);
   if (dateMatch) {
@@ -21,7 +20,6 @@ function extractDateFromContent(content: string): string {
   return new Date().toLocaleString();
 }
 
-// Helper function to extract vitals from content
 function extractVitalsFromContent(content: string): {
   heartRate: number;
   bloodAlcohol: number;
@@ -33,9 +31,8 @@ function extractVitalsFromContent(content: string): {
   const bloodPressureMatch = content.match(/Blood Pressure[:\s]+([\d/]+)/i);
   const heightMatch = content.match(/Height[:\s]+([^(\n]+)/i);
 
-  // Clean up height - remove "** " prefix if present
   let height = heightMatch ? heightMatch[1].trim() : '5\'10"';
-  height = height.replace(/^\*\*\s+/, ''); // Remove "** " from the beginning
+  height = height.replace(/^\*\*\s+/, ''); 
 
   return {
     heartRate: heartRateMatch ? parseInt(heartRateMatch[1]) : 85,
@@ -46,8 +43,6 @@ function extractVitalsFromContent(content: string): {
 }
 
 export async function saveReport(report: Omit<ClinicalReport, 'id' | 'createdAt'>): Promise<ClinicalReport> {
-  // This function is kept for backward compatibility but reports are now stored in Supabase
-  // If you need to save reports, you would need to implement Supabase insert
   const newReport: ClinicalReport = {
     ...report,
     id: `report_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
@@ -56,7 +51,6 @@ export async function saveReport(report: Omit<ClinicalReport, 'id' | 'createdAt'
   return newReport;
 }
 
-// Helper function to add timeout to promises
 function withTimeout<T>(promise: Promise<T>, timeoutMs: number = 10000): Promise<T> {
   const timeoutPromise = new Promise<never>((_, reject) => {
     setTimeout(() => {
@@ -69,10 +63,7 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs: number = 10000): Promise
 
 export async function getReports(): Promise<ClinicalReport[]> {
   try {
-    console.log('Fetching reports from Supabase...');
-    console.log('Supabase URL:', supabase.supabaseUrl);
     
-    // Create query with timeout
     const queryPromise = supabase
       .from('Expo')
       .select('*')
@@ -87,12 +78,10 @@ export async function getReports(): Promise<ClinicalReport[]> {
       console.error('Error details:', JSON.stringify(error, null, 2));
       console.error('Error hint:', error.hint);
       
-      // Check if it's an RLS (Row Level Security) issue
       if (error.code === 'PGRST301' || error.message?.includes('permission denied') || error.message?.includes('RLS')) {
-        console.error('⚠️ RLS (Row Level Security) may be blocking access. Check your Supabase RLS policies for the "Expo" table.');
+        console.error('RLS (Row Level Security) may be blocking access.');
       }
       
-      // If table doesn't exist, try lowercase
       if (error.code === 'PGRST116' || error.message?.includes('relation') || error.message?.includes('does not exist')) {
         console.log('Trying lowercase table name "expo"...');
         const { data: dataLower, error: errorLower } = await supabase
@@ -108,7 +97,6 @@ export async function getReports(): Promise<ClinicalReport[]> {
           return [];
         }
         
-        // Process the data from lowercase table
         const reports: ClinicalReport[] = dataLower.map((row: any) => {
           const reportContent = row.Report || row.report || '';
           const videoUrl = row.Video || row.video || undefined;
@@ -141,12 +129,10 @@ export async function getReports(): Promise<ClinicalReport[]> {
     console.log('Supabase response data:', JSON.stringify(data, null, 2));
     console.log('Number of records:', data?.length || 0);
     
-    // If we get an empty array with no error, it's likely RLS blocking access
     if (data && data.length === 0 && !error) {
-      console.warn('⚠️ Empty array returned - likely RLS (Row Level Security) blocking access');
-      console.warn('⚠️ Testing with service role key to confirm...');
+      console.warn('Empty array returned - likely RLS (Row Level Security) blocking access');
+      console.warn('Testing with service role key to confirm...');
       
-      // Try with service role key to confirm it's RLS
       try {
         const { data: adminData, error: adminError } = await supabaseAdmin
           .from('Expo')
@@ -156,17 +142,6 @@ export async function getReports(): Promise<ClinicalReport[]> {
         if (adminError) {
           console.error('Service role also failed:', adminError);
         } else if (adminData && adminData.length > 0) {
-          console.warn('✅ Service role key works! This confirms RLS is blocking the anon key.');
-          console.warn('📝 You need to create an RLS policy in Supabase:');
-          console.warn('   1. Go to Supabase Dashboard > Authentication > Policies');
-          console.warn('   2. Select the "Expo" table');
-          console.warn('   3. Create a policy for SELECT operations');
-          console.warn('   4. Allow the "anon" role to SELECT');
-          console.warn('   Example SQL:');
-          console.warn('     CREATE POLICY "Allow public read" ON "Expo" FOR SELECT USING (true);');
-          
-          // For now, use admin data (only for testing - remove in production!)
-          console.warn('⚠️ Using service role data temporarily - FIX RLS POLICIES!');
           const reports: ClinicalReport[] = adminData.map((row: any, index: number) => {
             console.log(`Processing admin row ${index}:`, {
               id: row.id,
@@ -222,7 +197,6 @@ export async function getReports(): Promise<ClinicalReport[]> {
       return [];
     }
 
-    // Map Supabase data to ClinicalReport format
     const reports: ClinicalReport[] = data.map((row: any, index: number) => {
       console.log(`Processing row ${index}:`, {
         id: row.id,
@@ -232,8 +206,6 @@ export async function getReports(): Promise<ClinicalReport[]> {
         allKeys: Object.keys(row)
       });
       
-      // Handle case-insensitive column names - try multiple variations
-      // Supabase may return column names in different cases depending on how they were created
       const reportContent = row.Report || row.report || row.REPORT || row['Report'] || row['report'] || '';
       const videoUrl = row.Video || row.video || row.VIDEO || row['Video'] || row['video'] || undefined;
       const vitals = extractVitalsFromContent(reportContent);
@@ -278,14 +250,12 @@ export async function getReport(id: string): Promise<ClinicalReport | null> {
   try {
     console.log('Fetching report with id:', id);
     
-    // Try with anon key first
     let { data, error } = await supabase
       .from('Expo')
       .select('*')
       .eq('id', id)
       .single();
 
-    // If we get an error or no data, try with service role key (RLS fallback)
     if (error || !data) {
       console.warn('Anon key failed, trying service role key...');
       const adminResult = await supabaseAdmin
@@ -315,7 +285,6 @@ export async function getReport(id: string): Promise<ClinicalReport | null> {
       allKeys: Object.keys(data)
     });
 
-    // Handle case-insensitive column names - try multiple variations
     const reportContent = data.Report || data.report || data.REPORT || data['Report'] || data['report'] || '';
     const videoUrl = data.Video || data.video || data.VIDEO || data['Video'] || data['video'] || undefined;
     const vitals = extractVitalsFromContent(reportContent);

@@ -32,7 +32,6 @@ export default function HomeScreen() {
       console.error('Error loading reports:', error);
       const errorMessage = error?.message || 'Failed to load reports. Please check your connection and try again.';
       setError(errorMessage);
-      // Set empty array on error so user can see the empty state
       setReports([]);
     } finally {
       setLoading(false);

@@ -24,8 +24,6 @@ import threading
 from driver import OLED_1in51, OLED_WIDTH, OLED_HEIGHT
 import numpy as np
 
-# Global OLED instance - shared with detect module
-# Will be set by main.py to avoid hardware conflicts
 oled = None
 
 import time
@@ -35,10 +33,10 @@ def oled_listening_animation(stop_event):
     """Pulsing circle animation while JARVIS is listening for input."""
     global oled
     if oled is None:
-        print("⚠️  Listening animation: OLED is None, skipping animation")
+        print("Listening animation: OLED is None, skipping animation")
         return
     
-    print("🎬 Listening animation started")
+    print("Listening animation started")
     phase = 0
     frame_count = 0
     
@@ -46,23 +44,19 @@ def oled_listening_animation(stop_event):
         image = Image.new("1", (OLED_WIDTH, OLED_HEIGHT), 255)
         draw = ImageDraw.Draw(image)
 
-        # Pulsing concentric circles to indicate listening
         center_x, center_y = OLED_WIDTH // 2, OLED_HEIGHT // 2
-        pulse = abs(np.sin(phase))  # Oscillates between 0 and 1
+        pulse = abs(np.sin(phase)) 
         
-        # Draw 3 concentric circles with pulsing effect
         for i in range(3):
             radius = int(10 + i * 8 + pulse * 8)
-            thickness = 2 if i == 1 else 1  # Middle circle slightly thicker
+            thickness = 2 if i == 1 else 1 
             
-            # Draw circle
             bbox = [
                 center_x - radius, center_y - radius,
                 center_x + radius, center_y + radius
             ]
             draw.ellipse(bbox, outline=0, width=thickness)
         
-        # Add a small center dot
         center_radius = int(3 + pulse * 2)
         center_bbox = [
             center_x - center_radius, center_y - center_radius,
@@ -70,7 +64,6 @@ def oled_listening_animation(stop_event):
         ]
         draw.ellipse(center_bbox, fill=0)
 
-        # upside-down for your display
         image = image.rotate(180)
 
         buf = oled.getbuffer(image)
@@ -80,11 +73,10 @@ def oled_listening_animation(stop_event):
         frame_count += 1
         time.sleep(0.08)
     
-    print(f"🎬 Listening animation stopped (rendered {frame_count} frames)")
+    print(f"Listening animation stopped (rendered {frame_count} frames)")
 
 
 def oled_speaking_animation(duration=3.0, speed=0.08):
-    """Cool Siri-style waveform animation while JARVIS is speaking."""
     global oled
     if oled is None:
         return
@@ -96,12 +88,10 @@ def oled_speaking_animation(duration=3.0, speed=0.08):
         image = Image.new("1", (OLED_WIDTH, OLED_HEIGHT), 255)
         draw = ImageDraw.Draw(image)
 
-        # waveform
         for x in range(0, OLED_WIDTH, 2):
             y = int(32 + 20 * np.sin((x / 10.0) + phase))
             draw.line((x, 32, x, y), fill=0)
 
-        # upside-down for your display
         image = image.rotate(180)
 
         buf = oled.getbuffer(image)
@@ -113,20 +103,6 @@ def oled_speaking_animation(duration=3.0, speed=0.08):
 
 
 class JARVIS:
-    """
-    JARVIS AI Assistant Library
-    
-    A modular chatbot that supports:
-    - Large text file context windows
-    - RAG (Retrieval-Augmented Generation) with ChromaDB
-    - Document ingestion from files and directories
-    - Easy integration into other projects
-    
-    Usage:
-        jarvis = JARVIS()
-        jarvis.add_context_from_file("large_document.txt")
-        response = jarvis.ask("What is this document about?")
-    """
     
     def __init__(
         self,
@@ -138,27 +114,13 @@ class JARVIS:
         tts_voice: str = "alloy",
         tts_model: str = "tts-1-hd"
     ):
-        """
-        Initialize JARVIS assistant.
-        
-        Args:
-            api_key: OpenAI API key (if None, loads from environment)
-            model: OpenAI chat model to use
-            embedding_model: OpenAI embedding model to use
-            temperature: Response temperature (0.0-1.0)
-            db_path: Path to ChromaDB storage (default: ./jarvis_db)
-            disable_telemetry: Disable ChromaDB telemetry
-            tts_voice: OpenAI TTS voice (alloy, echo, fable, onyx, nova, shimmer)
-            tts_model: OpenAI TTS model (tts-1 or tts-1-hd)
-        """
-        # Disable telemetry if requested
+
         if disable_telemetry:
             os.environ["ANONYMIZED_TELEMETRY"] = "False"
             os.environ["CHROMA_TELEMETRY_ENABLED"] = "False"
             os.environ["CHROMA_USE_OPENAI_EMBEDDINGS"] = "False"
             os.environ["CHROMA_DISABLE_TELEMETRY"] = "True"
         
-        # Load environment variables
         load_dotenv(find_dotenv())
         self.api_key = api_key or os.getenv("OPENAI_API_KEY")
         
@@ -168,16 +130,13 @@ class JARVIS:
                 "or set OPENAI_API_KEY environment variable."
             )
         
-        # Initialize OpenAI client
         self.client = OpenAI(api_key=self.api_key)
         self.model = model
         self.embedding_model = embedding_model
         
-        # Setup database
         self.db_path = pathlib.Path(db_path or "./jarvis_db")
         self.db_path.mkdir(exist_ok=True)
         
-        # Initialize ChromaDB
         settings = Settings(
             persist_directory=str(self.db_path),
             anonymized_telemetry=False,
@@ -185,68 +144,44 @@ class JARVIS:
         )
         self.chroma_client = chromadb.Client(settings)
         
-        # Create or get collection
         self.collection_name = f"jarvis_memory_{uuid.uuid4().hex[:8]}"
         self.collection = self.chroma_client.create_collection(
             name=self.collection_name
         )
         
-        # Context management
         self.context_chunks = []
         self.large_context = ""
         
-        # Speech recognition
         self.recognizer = sr.Recognizer()
         self.mic_device_index = None
         self.mic_device = None
-        self.silence_threshold = 3000  # Default threshold, can be set via set_silence_threshold()
+        self.silence_threshold = 3000  
+        self.tts_voice = tts_voice
+        self.tts_model = tts_model 
         
-        # Text-to-speech settings
-        self.tts_voice = tts_voice  # Options: alloy, echo, fable, onyx, nova, shimmer
-        self.tts_model = tts_model  # tts-1 or tts-1-hd for higher quality
-        
-        # Load system instructions
         self.system_instructions = self._load_instructions()
         
-        print(f"🤖 JARVIS initialized with collection: {self.collection_name}")
+        print(f"JARVIS initialized with collection: {self.collection_name}")
     
     def _load_instructions(self) -> str:
-        """Load system instructions from file."""
         instructions_file = pathlib.Path("jarvis_instructions.txt")
         
         if instructions_file.exists():
             try:
                 instructions = instructions_file.read_text(encoding="utf-8")
-                print("📋 Loaded system instructions")
+                print("Loaded system instructions")
                 return instructions
             except Exception as e:
-                print(f"⚠️ Could not load instructions: {e}")
+                print(f"Could not load instructions: {e}")
         
-        # Default instructions if file doesn't exist
         return """You are JARVIS, an intelligent AI assistant. 
 Be helpful, accurate, and concise. Use provided context when available."""
     
     def set_silence_threshold(self, threshold: float) -> None:
-        """
-        Set the silence threshold for voice detection.
-        This should be called after calibrating the noise floor.
-        
-        Args:
-            threshold: Energy threshold below which is considered silence
-        """
         self.silence_threshold = threshold
-        print(f"✅ JARVIS silence threshold set to: {threshold:.0f}")
+        print(f"JARVIS silence threshold set to: {threshold:.0f}")
     
     def reload_instructions(self, instructions_path: Optional[str] = None) -> bool:
-        """
-        Reload system instructions from file.
-        
-        Args:
-            instructions_path: Optional path to instructions file (default: jarvis_instructions.txt)
-        
-        Returns:
-            True if successfully reloaded
-        """
         if instructions_path:
             instructions_file = pathlib.Path(instructions_path)
         else:
@@ -258,14 +193,13 @@ Be helpful, accurate, and concise. Use provided context when available."""
         
         try:
             self.system_instructions = instructions_file.read_text(encoding="utf-8")
-            print(f"✅ Reloaded instructions from {instructions_file}")
+            print(f"Reloaded instructions from {instructions_file}")
             return True
         except Exception as e:
-            print(f"❌ Error reloading instructions: {e}")
+            print(f"Error reloading instructions: {e}")
             return False
     
     def _embed_documents(self, texts: List[str]) -> List[List[float]]:
-        """Generate embeddings for multiple documents."""
         res = self.client.embeddings.create(
             model=self.embedding_model,
             input=texts
@@ -273,7 +207,6 @@ Be helpful, accurate, and concise. Use provided context when available."""
         return [d.embedding for d in res.data]
     
     def _embed_query(self, text: str) -> List[float]:
-        """Generate embedding for a single query."""
         res = self.client.embeddings.create(
             model=self.embedding_model,
             input=[text]
@@ -281,7 +214,6 @@ Be helpful, accurate, and concise. Use provided context when available."""
         return res.data[0].embedding
     
     def _extract_text_from_file(self, filepath: pathlib.Path) -> str:
-        """Extract text from .txt or .pdf file."""
         text = ""
         
         if filepath.suffix.lower() == ".txt":
@@ -303,17 +235,6 @@ Be helpful, accurate, and concise. Use provided context when available."""
         chunk_size: int = 2000,
         chunk_overlap: int = 200
     ) -> int:
-        """
-        Add a large text file to JARVIS's context window.
-        
-        Args:
-            filepath: Path to .txt or .pdf file
-            chunk_size: Size of text chunks for vector storage
-            chunk_overlap: Overlap between chunks for better context
-        
-        Returns:
-            Number of chunks added
-        """
         filepath = pathlib.Path(filepath)
         
         if not filepath.exists():
@@ -322,20 +243,17 @@ Be helpful, accurate, and concise. Use provided context when available."""
         text = self._extract_text_from_file(filepath)
         
         if not text:
-            print(f"⚠️ No text extracted from {filepath.name}")
+            print(f"No text extracted from {filepath.name}")
             return 0
         
-        # Store full text for direct context
         self.large_context += "\n\n" + text
         
-        # Split into overlapping chunks
         chunks = []
         for i in range(0, len(text), chunk_size - chunk_overlap):
             chunk = text[i:i + chunk_size]
             if chunk.strip():
                 chunks.append(chunk)
         
-        # Generate embeddings and store in vector DB
         if chunks:
             vectors = self._embed_documents(chunks)
             ids = [f"{filepath.stem}_{uuid.uuid4().hex[:6]}_{i}" 
@@ -349,7 +267,7 @@ Be helpful, accurate, and concise. Use provided context when available."""
             )
             
             self.context_chunks.extend(chunks)
-            print(f"✅ Added {len(chunks)} chunks from {filepath.name}")
+            print(f"Added {len(chunks)} chunks from {filepath.name}")
         
         return len(chunks)
     
@@ -360,18 +278,6 @@ Be helpful, accurate, and concise. Use provided context when available."""
         chunk_overlap: int = 200,
         recursive: bool = False
     ) -> int:
-        """
-        Add all .txt and .pdf files from a directory to context.
-        
-        Args:
-            directory: Path to directory containing documents
-            chunk_size: Size of text chunks for vector storage
-            chunk_overlap: Overlap between chunks
-            recursive: If True, search subdirectories recursively
-        
-        Returns:
-            Total number of chunks added
-        """
         directory = pathlib.Path(directory)
         
         if not directory.exists():
@@ -380,10 +286,9 @@ Be helpful, accurate, and concise. Use provided context when available."""
         total_chunks = 0
         file_count = 0
         
-        # Choose glob pattern based on recursive flag
         if recursive:
             pattern = "**/*"
-            print(f"🔍 Recursively searching {directory} for documents...")
+            print(f"Recursively searching {directory} for documents...")
         else:
             pattern = "*"
         
@@ -398,9 +303,9 @@ Be helpful, accurate, and concise. Use provided context when available."""
                     total_chunks += chunks
                     file_count += 1
                 except Exception as e:
-                    print(f"⚠️ Error processing {file.name}: {e}")
+                    print(f"Error processing {file.name}: {e}")
         
-        print(f"📚 Total: {total_chunks} chunks from {file_count} files")
+        print(f"Total: {total_chunks} chunks from {file_count} files")
         return total_chunks
     
     def add_context_from_text(
@@ -409,31 +314,17 @@ Be helpful, accurate, and concise. Use provided context when available."""
         chunk_size: int = 2000,
         chunk_overlap: int = 200
     ) -> int:
-        """
-        Add raw text to JARVIS's context window.
-        
-        Args:
-            text: Text string to add
-            chunk_size: Size of text chunks for vector storage
-            chunk_overlap: Overlap between chunks
-        
-        Returns:
-            Number of chunks added
-        """
         if not text.strip():
             return 0
         
-        # Store full text for direct context
         self.large_context += "\n\n" + text
         
-        # Split into overlapping chunks
         chunks = []
         for i in range(0, len(text), chunk_size - chunk_overlap):
             chunk = text[i:i + chunk_size]
             if chunk.strip():
                 chunks.append(chunk)
         
-        # Generate embeddings and store in vector DB
         if chunks:
             vectors = self._embed_documents(chunks)
             ids = [f"text_{uuid.uuid4().hex[:6]}_{i}" 
@@ -447,7 +338,7 @@ Be helpful, accurate, and concise. Use provided context when available."""
             )
             
             self.context_chunks.extend(chunks)
-            print(f"✅ Added {len(chunks)} chunks from text")
+            print(f"Added {len(chunks)} chunks from text")
         
         return len(chunks)
     
@@ -456,7 +347,6 @@ Be helpful, accurate, and concise. Use provided context when available."""
         query: str,
         n_results: int = 5
     ) -> List[str]:
-        """Retrieve relevant context chunks for a query."""
         try:
             qvec = self._embed_query(query)
             results = self.collection.query(
@@ -466,7 +356,7 @@ Be helpful, accurate, and concise. Use provided context when available."""
             docs = results.get("documents", [[]])[0]
             return docs
         except Exception as e:
-            print(f"⚠️ Error retrieving context: {e}")
+            print(f"Error retrieving context: {e}")
             return []
     
     def ask(
@@ -477,20 +367,6 @@ Be helpful, accurate, and concise. Use provided context when available."""
         include_sources: bool = False,
         system_prompt: Optional[str] = None
     ) -> str:
-        """
-        Ask JARVIS a question.
-        
-        Args:
-            query: The question to ask
-            use_rag: Use RAG to retrieve relevant context
-            n_results: Number of context chunks to retrieve
-            include_sources: Include source information in response
-            system_prompt: Custom system prompt (overrides default)
-        
-        Returns:
-            JARVIS's response
-        """
-        # Build context
         context_parts = []
         sources = []
         
@@ -501,7 +377,6 @@ Be helpful, accurate, and concise. Use provided context when available."""
                 context_parts.extend(relevant_docs)
                 sources = ["Vector Database"] * len(relevant_docs)
         
-        # Build prompt
         if system_prompt is None:
             system_prompt = self.system_instructions
         
@@ -516,7 +391,6 @@ Be helpful, accurate, and concise. Use provided context when available."""
         else:
             messages.append({"role": "user", "content": query})
         
-        # Get response from OpenAI
         try:
             response = self.client.chat.completions.create(
                 model=self.model,
@@ -538,21 +412,9 @@ Be helpful, accurate, and concise. Use provided context when available."""
         use_context: bool = True,
         n_results: int = 3
     ) -> str:
-        """
-        Multi-turn conversation with JARVIS.
-        
-        Args:
-            messages: List of message dicts with 'role' and 'content'
-            use_context: Inject relevant context based on last message
-            n_results: Number of context chunks to retrieve
-        
-        Returns:
-            JARVIS's response
-        """
         if not messages:
             return "No messages provided."
         
-        # Inject context if requested
         if use_context and self.context_chunks:
             last_message = messages[-1]["content"]
             relevant_docs = self._retrieve_relevant_context(
@@ -564,7 +426,6 @@ Be helpful, accurate, and concise. Use provided context when available."""
                 context_msg = "Relevant context:\n" + "\n\n".join(relevant_docs)
                 messages.insert(-1, {"role": "system", "content": context_msg})
         
-        # Get response
         try:
             response = self.client.chat.completions.create(
                 model=self.model,
@@ -580,55 +441,37 @@ Be helpful, accurate, and concise. Use provided context when available."""
         device_name_prefix: Optional[str] = None,
         auto_select: bool = True
     ) -> bool:
-        """
-        Setup microphone device for speech recognition.
-        
-        Args:
-            device_name_prefix: Prefix to match (e.g., "PCM", "NoiseTorch")
-            auto_select: Automatically select first matching device
-        
-        Returns:
-            True if device was set up successfully
-        """
         try:
             devices = sd.query_devices()
             input_devices = [(i, d) for i, d in enumerate(devices) if d['max_input_channels'] > 0]
             
             if not input_devices:
-                print("⚠️ No input devices detected!")
+                print("No input devices detected!")
                 return False
             
-            # Find device by prefix if specified
             if device_name_prefix:
                 for idx, device in input_devices:
                     if device['name'].startswith(device_name_prefix):
                         self.mic_device_index = idx
                         self.mic_device = device
-                        print(f"✅ Selected microphone: {device['name']}")
+                        print(f"Selected microphone: {device['name']}")
                         return True
                 
-                print(f"⚠️ No device found with prefix '{device_name_prefix}'")
+                print(f"No device found with prefix '{device_name_prefix}'")
             
-            # Use default device
             if auto_select:
-                self.mic_device_index = sd.default.device[0]  # Input device
+                self.mic_device_index = sd.default.device[0] 
                 self.mic_device = devices[self.mic_device_index]
-                print(f"✅ Using default microphone: {self.mic_device['name']}")
+                print(f"Using default microphone: {self.mic_device['name']}")
                 return True
             
             return False
             
         except Exception as e:
-            print(f"❌ Error setting up microphone: {e}")
+            print(f"Error setting up microphone: {e}")
             return False
     
     def list_microphones(self) -> List[Dict[str, Any]]:
-        """
-        List all available input devices.
-        
-        Returns:
-            List of device info dictionaries
-        """
         try:
             devices = sd.query_devices()
             input_devices = []
@@ -645,7 +488,7 @@ Be helpful, accurate, and concise. Use provided context when available."""
             return input_devices
             
         except Exception as e:
-            print(f"❌ Error listing microphones: {e}")
+            print(f"Error listing microphones: {e}")
             return []
     
     def listen_continuous(
@@ -653,18 +496,6 @@ Be helpful, accurate, and concise. Use provided context when available."""
         frame_duration: int = 2,
         language: str = "en-US"
     ) -> Optional[str]:
-        """
-        Listen with overlapping frames for better wake word detection.
-        Records frames with 50% overlap (e.g., 2s frames with 1s stride).
-        
-        Args:
-            frame_duration: Duration of each recording frame in seconds
-            language: Language code (e.g., 'en-US', 'es-ES')
-        
-        Returns:
-            Transcribed text or None if recognition failed
-        """
-        # Setup microphone if not already done
         if self.mic_device_index is None:
             if not self.setup_microphone(device_name_prefix="PCM", auto_select=True):
                 return None
@@ -673,7 +504,6 @@ Be helpful, accurate, and concise. Use provided context when available."""
             sample_rate = int(self.mic_device['default_samplerate'])
             channels = 1
             
-            # Record audio using sounddevice (NO animation for wake word detection)
             audio_data = sd.rec(
                 int(frame_duration * sample_rate),
                 samplerate=sample_rate,
@@ -681,29 +511,23 @@ Be helpful, accurate, and concise. Use provided context when available."""
                 dtype='int16',
                 device=self.mic_device_index
             )
-            sd.wait()  # Wait until recording is finished
-            
-            # Debug: Check audio levels
+            sd.wait()  
             audio_max = np.abs(audio_data).max()
-            if audio_max < 100:  # Very quiet audio
-                print(f"⚠️ Warning: Audio level very low ({audio_max}). Check microphone volume!")
+            if audio_max < 100: 
+                print(f"Warning: Audio level very low ({audio_max}). Check microphone volume!")
             
-            # Convert to WAV format in memory
             wav_io = io.BytesIO()
             with wave.open(wav_io, 'wb') as wav_file:
                 wav_file.setnchannels(channels)
-                wav_file.setsampwidth(2)  # 2 bytes for int16
+                wav_file.setsampwidth(2) 
                 wav_file.setframerate(sample_rate)
                 wav_file.writeframes(audio_data.tobytes())
             
-            # Reset to beginning of BytesIO
             wav_io.seek(0)
             
-            # Use speech_recognition to transcribe
             with sr.AudioFile(wav_io) as source:
                 audio = self.recognizer.record(source)
             
-            # Recognize speech using Google Speech Recognition
             text = self.recognizer.recognize_google(
                 audio,
                 language=language
@@ -712,16 +536,14 @@ Be helpful, accurate, and concise. Use provided context when available."""
             return text
         
         except sr.UnknownValueError:
-            # Google couldn't understand the audio
-            # This usually means audio is too quiet, corrupted, or just silence/noise
             return None
         
         except sr.RequestError as e:
-            print(f"❌ Google API request failed: {e}")
+            print(f"Google API request failed: {e}")
             return None
         
         except Exception as e:
-            print(f"❌ Recognition error: {e}")
+            print(f"Recognition error: {e}")
             return None
     
     def listen_with_silence_detection(
@@ -732,41 +554,23 @@ Be helpful, accurate, and concise. Use provided context when available."""
         language: str = "en-US",
         auto_calibrate: bool = False
     ) -> Optional[str]:
-        """
-        Listen to microphone and automatically stop when user stops talking.
-        Uses chunk-based recording to avoid streaming issues with virtual devices.
-        
-        Args:
-            max_duration: Maximum recording duration in seconds
-            silence_threshold: Energy threshold below which is considered silence (uses instance variable if None)
-            silence_duration: Seconds of silence before stopping
-            language: Language code (e.g., 'en-US', 'es-ES')
-            auto_calibrate: Automatically calibrate noise floor (default False, done centrally in main)
-        
-        Returns:
-            Transcribed text or None if recognition failed
-        """
-        # Setup microphone if not already done
         if self.mic_device_index is None:
-            print("🔧 Setting up microphone...")
+            print("Setting up microphone...")
             if not self.setup_microphone(device_name_prefix="PCM", auto_select=True):
-                print("❌ Failed to setup microphone")
+                print("Failed to setup microphone")
                 return None
         
         try:
             sample_rate = int(self.mic_device['default_samplerate'])
             channels = 1
-            chunk_duration = 0.5  # 500ms chunks (safer for virtual devices)
-            
-            # Use provided threshold, or fall back to instance variable
+            chunk_duration = 0.5  
             if silence_threshold is None:
                 silence_threshold = self.silence_threshold
             
-            # Auto-calibrate noise floor (only if explicitly requested)
             if auto_calibrate:
-                print("🔧 Calibrating noise floor... (stay quiet for 2 seconds)")
+                print("Calibrating noise floor... (stay quiet for 2 seconds)")
                 calibration_samples = []
-                for _ in range(4):  # 4 chunks = 2 seconds
+                for _ in range(4):
                     chunk_data = sd.rec(
                         int(chunk_duration * sample_rate),
                         samplerate=sample_rate,
@@ -778,15 +582,13 @@ Be helpful, accurate, and concise. Use provided context when available."""
                     energy = np.abs(chunk_data).mean()
                     calibration_samples.append(energy)
                 
-                # Set threshold as 2.5x the average background noise
                 avg_noise = np.mean(calibration_samples)
                 silence_threshold = avg_noise * 2.5
                 self.silence_threshold = silence_threshold
-                print(f"✅ Noise floor: {avg_noise:.0f}, Speech threshold: {silence_threshold:.0f}")
+                print(f"Noise floor: {avg_noise:.0f}, Speech threshold: {silence_threshold:.0f}")
             
-            print(f"🎤 Listening... Speak now! (stops automatically when you finish)")
+            print(f"Listening... Speak now! (stops automatically when you finish)")
             
-            # Start listening animation
             stop_animation = threading.Event()
             anim_thread = threading.Thread(
                 target=oled_listening_animation,
@@ -795,14 +597,12 @@ Be helpful, accurate, and concise. Use provided context when available."""
             )
             anim_thread.start()
             
-            # Storage for audio data
             all_audio_chunks = []
             silence_time = 0
             has_speech = False
             total_time = 0
             
             while total_time < max_duration:
-                # Record a chunk
                 chunk_data = sd.rec(
                     int(chunk_duration * sample_rate),
                     samplerate=sample_rate,
@@ -810,83 +610,72 @@ Be helpful, accurate, and concise. Use provided context when available."""
                     dtype='int16',
                     device=self.mic_device_index
                 )
-                sd.wait()  # Wait for chunk to complete
+                sd.wait()  
                 
                 all_audio_chunks.append(chunk_data.copy())
                 total_time += chunk_duration
                 
-                # Calculate energy (volume) of chunk
                 energy = np.abs(chunk_data).mean()
                 
                 if energy > silence_threshold:
-                    # Speech detected
                     silence_time = 0
                     has_speech = True
-                    print(".", end="", flush=True)  # Visual feedback
+                    print(".", end="", flush=True) 
                 else:
-                    # Silence detected
                     if has_speech:
                         silence_time += chunk_duration
-                        print("_", end="", flush=True)  # Visual feedback
-                
-                # Stop if we've had enough silence after speech
+                        print("_", end="", flush=True) 
                 if has_speech and silence_time >= silence_duration:
-                    print("\n🔇 Silence detected, stopping...")
+                    print("\nSilence detected, stopping...")
                     break
             
             if not has_speech:
-                print("\n⚠️ No speech detected")
+                print("\nNo speech detected")
                 stop_animation.set()
                 anim_thread.join(timeout=0.1)
                 return None
             
-            print("\n🔄 Processing speech...")
+            print("\nProcessing speech")
             
-            # Stop listening animation before processing
             stop_animation.set()
             anim_thread.join(timeout=0.1)
             
-            # Concatenate all audio chunks
             audio_data = np.concatenate(all_audio_chunks, axis=0)
             
-            # Convert to WAV format in memory
             wav_io = io.BytesIO()
             with wave.open(wav_io, 'wb') as wav_file:
                 wav_file.setnchannels(channels)
-                wav_file.setsampwidth(2)  # 2 bytes for int16
+                wav_file.setsampwidth(2)
                 wav_file.setframerate(sample_rate)
                 wav_file.writeframes(audio_data.tobytes())
             
-            # Reset to beginning of BytesIO
             wav_io.seek(0)
             
-            # Use speech_recognition to transcribe
             with sr.AudioFile(wav_io) as source:
                 audio = self.recognizer.record(source)
             
-            # Recognize speech using Google Speech Recognition
             text = self.recognizer.recognize_google(
                 audio,
                 language=language
             )
             
-            print(f"📝 You said: {text}")
+            print(f"You said: {text}")
             return text
         
         except sr.UnknownValueError:
-            print("❓ Could not understand the audio.")
+            print("Could not understand the audio.")
             stop_animation.set()
             anim_thread.join(timeout=0.1)
             return None
         
         except sr.RequestError as e:
-            print(f"❌ Speech recognition service error: {e}")
+            print(f"Speech recognition service error: {e}")
             stop_animation.set()
             anim_thread.join(timeout=0.1)
             return None
         
         except Exception as e:
-            print(f"❌ Error during speech recognition: {e}")
+            print(f"Error during speech recognition: {e}")
             import traceback
             traceback.print_exc()
             stop_animation.set()
@@ -899,31 +688,18 @@ Be helpful, accurate, and concise. Use provided context when available."""
         language: str = "en-US",
         show_all: bool = False
     ) -> Optional[str]:
-        """
-        Listen to microphone and convert speech to text using sounddevice.
-        
-        Args:
-            duration: Recording duration in seconds
-            language: Language code (e.g., 'en-US', 'es-ES')
-            show_all: Return all alternative transcriptions
-        
-        Returns:
-            Transcribed text or None if recognition failed
-        """
-        # Setup microphone if not already done
         if self.mic_device_index is None:
-            print("🔧 Setting up microphone...")
+            print("Setting up microphone...")
             if not self.setup_microphone(device_name_prefix="PCM", auto_select=True):
-                print("❌ Failed to setup microphone")
+                print("Failed to setup microphone")
                 return None
         
         try:
             sample_rate = int(self.mic_device['default_samplerate'])
             channels = 1
             
-            print(f"🎤 Recording for {duration} seconds... Speak now!")
+            print(f"Recording for {duration} seconds... Speak now!")
             
-            # Record audio using sounddevice (NO animation for simple listen)
             audio_data = sd.rec(
                 int(duration * sample_rate),
                 samplerate=sample_rate,
@@ -931,45 +707,41 @@ Be helpful, accurate, and concise. Use provided context when available."""
                 dtype='int16',
                 device=self.mic_device_index
             )
-            sd.wait()  # Wait until recording is finished
+            sd.wait() 
             
-            print("🔄 Processing speech...")
+            print("Processing speech...")
             
-            # Convert to WAV format in memory
             wav_io = io.BytesIO()
             with wave.open(wav_io, 'wb') as wav_file:
                 wav_file.setnchannels(channels)
-                wav_file.setsampwidth(2)  # 2 bytes for int16
+                wav_file.setsampwidth(2)
                 wav_file.setframerate(sample_rate)
                 wav_file.writeframes(audio_data.tobytes())
             
-            # Reset to beginning of BytesIO
             wav_io.seek(0)
             
-            # Use speech_recognition to transcribe
             with sr.AudioFile(wav_io) as source:
                 audio = self.recognizer.record(source)
             
-            # Recognize speech using Google Speech Recognition
             text = self.recognizer.recognize_google(
                 audio,
                 language=language,
                 show_all=show_all
             )
             
-            print(f"📝 You said: {text}")
+            print(f"You said: {text}")
             return text
         
         except sr.UnknownValueError:
-            print("❓ Could not understand the audio.")
+            print("Could not understand the audio.")
             return None
         
         except sr.RequestError as e:
-            print(f"❌ Speech recognition service error: {e}")
+            print(f"Speech recognition service error: {e}")
             return None
         
         except Exception as e:
-            print(f"❌ Error during speech recognition: {e}")
+            print(f"Error during speech recognition: {e}")
             import traceback
             traceback.print_exc()
             return None
@@ -980,26 +752,22 @@ Be helpful, accurate, and concise. Use provided context when available."""
     voice: Optional[str] = None, 
     save_to: Optional[str] = None
     ) -> bool:
-        """Speak text and show OLED speaking animation."""
         try:
             voice = voice or self.tts_voice
 
-            # --- OLED SPEAKING ANIMATION THREAD ---
             anim_thread = threading.Thread(
                 target=oled_speaking_animation,
-                args=(max(2.0, len(text) * 0.15),),   # automatically adjusted later
+                args=(max(2.0, len(text) * 0.15),),
                 daemon=True
             )
             anim_thread.start()
 
-            # Generate audio
             response = self.client.audio.speech.create(
                 model=self.tts_model,
                 voice=voice,
                 input=text
             )
 
-            # Save
             if save_to:
                 audio_path = save_to
                 with open(audio_path, 'wb') as audio_file:
@@ -1011,7 +779,6 @@ Be helpful, accurate, and concise. Use provided context when available."""
                     audio_path = temp_audio.name
                 should_delete = True
 
-            # Play audio
             played = False
             for cmd in [
                 ["mpv", "--really-quiet", audio_path],
@@ -1025,17 +792,15 @@ Be helpful, accurate, and concise. Use provided context when available."""
                 except:
                     pass
 
-            # wait for animation to end
             anim_thread.join(timeout=0.1)
 
-            # cleanup
             if should_delete:
                 os.remove(audio_path)
 
             return played
 
         except Exception as e:
-            print(f"❌ Error speaking: {e}")
+            print(f"Error speaking: {e}")
             return False
 
     def listen_and_ask(
@@ -1050,26 +815,6 @@ Be helpful, accurate, and concise. Use provided context when available."""
         speak_response: bool = False,
         save_audio_to: Optional[str] = None
     ) -> Optional[str]:
-        """
-        Listen to speech input and get JARVIS's response.
-        
-        Convenience method that combines listen() and ask().
-        
-        Args:
-            duration: Recording duration in seconds (if auto_stop=False)
-            language: Language code for speech recognition
-            use_rag: Use RAG to retrieve relevant context
-            n_results: Number of context chunks to retrieve
-            auto_stop: Automatically stop when user stops talking
-            max_duration: Maximum recording duration if auto_stop=True
-            silence_duration: Seconds of silence before auto-stopping
-            speak_response: Speak the response using TTS
-            save_audio_to: Optional path to save audio response (e.g., "response.mp3")
-        
-        Returns:
-            JARVIS's response or None if speech recognition failed
-        """
-        # Listen for speech with or without auto-stop
         if auto_stop:
             query = self.listen_with_silence_detection(
                 max_duration=max_duration,
@@ -1085,22 +830,18 @@ Be helpful, accurate, and concise. Use provided context when available."""
         if query is None:
             return None
         
-        # Get response from JARVIS
-        print("🤖 JARVIS is thinking...")
+        print("JARVIS is thinking")
         response = self.ask(query, use_rag=use_rag, n_results=n_results)
         
-        # Speak response if requested
         if speak_response and response:
             self.speak(response, save_to=save_audio_to)
         
         return response
     
     def clear_context(self):
-        """Clear all stored context and reset the database."""
         self.context_chunks = []
         self.large_context = ""
         
-        # Create new collection
         try:
             self.chroma_client.delete_collection(name=self.collection_name)
         except:
@@ -1114,7 +855,6 @@ Be helpful, accurate, and concise. Use provided context when available."""
         print("🧹 Context cleared. New collection created.")
     
     def get_stats(self) -> Dict[str, Any]:
-        """Get statistics about JARVIS's current state."""
         return {
             "total_chunks": len(self.context_chunks),
             "collection_name": self.collection_name,
@@ -1123,16 +863,5 @@ Be helpful, accurate, and concise. Use provided context when available."""
             "context_size_chars": len(self.large_context)
         }
 
-
-# Convenience function for quick usage
 def create_jarvis(**kwargs) -> JARVIS:
-    """
-    Create a JARVIS instance with default settings.
-    
-    Usage:
-        jarvis = create_jarvis()
-        jarvis.add_context_from_file("document.txt")
-        response = jarvis.ask("Tell me about this document")
-    """
     return JARVIS(**kwargs)
-
