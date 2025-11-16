@@ -52,7 +52,7 @@ security_units = {
     "Unit B": "4 minutes away"
 }
 
-def oled_print(text, size=9):
+def oled_print(text, size=6):
     global oled
 
     # Create blank image
@@ -70,7 +70,7 @@ def oled_print(text, size=9):
     line = ""
     lines = []
     for w in words:
-        if len(line) + len(w) < 18:
+        if len(line) + len(w) < 24:
             line += " " + w
         else:
             lines.append(line.strip())
