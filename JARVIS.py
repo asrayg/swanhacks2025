@@ -21,7 +21,6 @@ from PIL import Image, ImageDraw, ImageFont
 import threading
 from driver import OLED_1in51, OLED_WIDTH, OLED_HEIGHT
 import numpy as np
-import base64
 
 oled = None
 
@@ -347,47 +346,37 @@ Be helpful, accurate, and concise. Use provided context when available."""
             print(f"Error retrieving context: {e}")
             return []
     
-    def _transcribe_with_gpt4o(self, audio_file_path, language="en-US"):
+    def _transcribe_with_whisper(self, audio_file_path, language="en-US"):
         """
-        Transcribe audio using GPT-4o-transcribe model
+        Transcribe audio using Whisper-1 model
         Args:
             audio_file_path: Path to the WAV audio file
-            language: Language code (e.g., "en-US") - passed for compatibility but not used by GPT-4o
+            language: Language code (e.g., "en-US", "es-ES") - optional for Whisper
         Returns:
             Transcribed text or None if failed
         """
         try:
-            with open(audio_file_path, "rb") as f:
-                audio_data = base64.b64encode(f.read()).decode('utf-8')
-            
-            response = self.client.chat.completions.create(
-                model="gpt-4o-transcribe",
-                modalities=["text"],
-                messages=[
-                    {
-                        "role": "user",
-                        "content": [
-                            {
-                                "type": "input_audio",
-                                "input_audio": {
-                                    "data": audio_data,
-                                    "format": "wav"
-                                }
-                            },
-                            {
-                                "type": "text",
-                                "text": "Transcribe this audio exactly as spoken."
-                            }
-                        ]
-                    }
-                ]
-            )
-            
-            transcription = response.choices[0].message.content.strip()
-            return transcription
+            with open(audio_file_path, "rb") as audio_file:
+                # Extract language code if provided (e.g., "en-US" -> "en")
+                lang_code = language.split("-")[0] if language else None
+                
+                # Create transcription using Whisper
+                if lang_code:
+                    transcription = self.client.audio.transcriptions.create(
+                        model="whisper-1",
+                        file=audio_file,
+                        language=lang_code
+                    )
+                else:
+                    transcription = self.client.audio.transcriptions.create(
+                        model="whisper-1",
+                        file=audio_file
+                    )
+                
+                return transcription.text.strip()
             
         except Exception as e:
-            print(f"Error in GPT-4o transcription: {e}")
+            print(f"Error in Whisper transcription: {e}")
             return None
     
     def ask(
@@ -539,8 +528,8 @@ Be helpful, accurate, and concise. Use provided context when available."""
                 wav_file.setframerate(sample_rate)
                 wav_file.writeframes(audio_data.tobytes())
             
-            # Transcribe using GPT-4o
-            text = self._transcribe_with_gpt4o(temp_filename, language)
+            # Transcribe using Whisper
+            text = self._transcribe_with_whisper(temp_filename, language)
             
             # Clean up temp file
             try:
@@ -658,8 +647,8 @@ Be helpful, accurate, and concise. Use provided context when available."""
                 wav_file.setframerate(sample_rate)
                 wav_file.writeframes(audio_data.tobytes())
             
-            # Transcribe using GPT-4o
-            text = self._transcribe_with_gpt4o(temp_filename, language)
+            # Transcribe using Whisper
+            text = self._transcribe_with_whisper(temp_filename, language)
             
             # Clean up temp file
             try:
@@ -720,8 +709,8 @@ Be helpful, accurate, and concise. Use provided context when available."""
                 wav_file.setframerate(sample_rate)
                 wav_file.writeframes(audio_data.tobytes())
             
-            # Transcribe using GPT-4o
-            text = self._transcribe_with_gpt4o(temp_filename, language)
+            # Transcribe using Whisper
+            text = self._transcribe_with_whisper(temp_filename, language)
             
             # Clean up temp file
             try:
