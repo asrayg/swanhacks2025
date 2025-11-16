@@ -12,10 +12,27 @@ import threading
 import re
 import random
 from supabase import create_client, Client
+from driver import OLED_1in51, OLED_WIDTH, OLED_HEIGHT
+import subprocess
+
+# Capture frame using rpicam-still (works even without /dev/video0)
+def capture_frame(path="/dev/shm/frame.jpg"):
+    cmd = [
+        "rpicam-still",
+        "-t", "1",            # no preview delay
+        "--width", "640",
+        "--height", "480",
+        "-n",                 # no preview window
+        "-o", path
+    ]
+    subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    return cv2.imread(path)
 
 
 load_dotenv()
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+oled = OLED_1in51()
+oled.Init()
 
 # -----------------------------
 # SUPABASE CONFIGURATION
@@ -148,26 +165,23 @@ def realtime_routing_alert(result):
     aggro = result.get("aggression", False)
     level = result.get("aggression_level", 0)
 
-    print("\n📡 ROUTING STATUS UPDATE ---------------------------")
 
     # ---------------------------------------------------------
     # 🚨 SECURITY RESPONSE
     # ---------------------------------------------------------
     if routing == "security":
-        print("🚨 SECURITY DISPATCHED:")
+        oled_print(oled, "SECURITY 🚨")
         for unit, eta in security_units.items():
-            print(f"   • {unit} → ETA {eta}")
-        print("--------------------------------------------------")
+            oled_print(oled,f"   • {unit} → ETA {eta}")
         return
 
     if routing == "emergency":
-        print("🚑 EMERGENCY RESPONSE ACTIVATED:")
-        print("   • Notifying all security units:")
+        oled_print(oled,"🚑 EMERGENCY RESPONSE ACTIVATED:")
+        oled_print(oled,"   • Notifying all security units:")
         for unit, eta in security_units.items():
-            print(f"       - {unit} → ETA {eta}")
+            oled_print(oled,f"       - {unit} → ETA {eta}")
         name, eta = doctors_available["emergency"]
-        print(f"   • Paging ER Doctor: {name} → ETA {eta} minutes")
-        print("--------------------------------------------------")
+        oled_print(oled,f"   • Paging ER Doctor: {name} → ETA {eta} minutes")
         return
 
     # ---------------------------------------------------------
@@ -175,26 +189,23 @@ def realtime_routing_alert(result):
     # ---------------------------------------------------------
     if routing == "doctor":
         name, eta = doctors_available["general"]
-        print("👨‍⚕️ DOCTOR PAGED:")
-        print(f"   • {name} → ETA {eta} minutes")
-        print(f"   • Issue: {issue}")
-        print("--------------------------------------------------")
+        oled_print(oled,"👨‍⚕️ DOCTOR PAGED:")
+        oled_print(oled,f"   • {name} → ETA {eta} minutes")
+        oled_print(oled,f"   • Issue: {issue}")
         return
 
     if routing == "allergy":
         name, eta = doctors_available["allergy"]
-        print("🌰 ALLERGY SPECIALIST PAGED:")
-        print(f"   • {name} → ETA {eta} minutes")
-        print(f"   • Trigger: {issue}")
-        print("--------------------------------------------------")
+        oled_print(oled,"🌰 ALLERGY SPECIALIST PAGED:")
+        oled_print(oled,f"   • {name} → ETA {eta} minutes")
+        oled_print(oled,f"   • Trigger: {issue}")
         return
 
     if routing == "injury":
         name, eta = doctors_available["injury"]
-        print("🩹 TRAUMA/INJURY PHYSICIAN PAGED:")
-        print(f"   • {name} → ETA {eta} minutes")
-        print(f"   • Issue: {issue}")
-        print("--------------------------------------------------")
+        oled_print(oled,"🩹 TRAUMA/INJURY PHYSICIAN PAGED:")
+        oled_print(oled,f"   • {name} → ETA {eta} minutes")
+        oled_print(oled,f"   • Issue: {issue}")
         return
 
     # ---------------------------------------------------------
@@ -203,17 +214,15 @@ def realtime_routing_alert(result):
     if routing == "none":
         dynamic = generate_dynamic_vitals()
 
-        print("✅ No routing required at this moment.")
-        print("   • Vitals stable (auto-monitoring active)")
-        print(f"   • Heart Rate:       {dynamic['heart_rate']}")
-        print(f"   • Blood Pressure:   {dynamic['blood_pressure']}")
-        print(f"   • Oxygen Level:     {dynamic['oxygen']}")
-        print(f"   • Respiration:      {dynamic['respiration']}")
-        print(f"   • Temperature:      {dynamic['temperature']}")
-        print("   • No aggression detected.")
-        print("   • No medical issues detected.")
-        print("   • Continuing normal monitoring...")
-        print("--------------------------------------------------")
+        oled_print(oled,"   • Vitals stable (auto-monitoring active)")
+        oled_print(oled,f"   • Heart Rate:       {dynamic['heart_rate']}")
+        oled_print(oled,f"   • Blood Pressure:   {dynamic['blood_pressure']}")
+        oled_print(oled,f"   • Oxygen Level:     {dynamic['oxygen']}")
+        oled_print(oled,f"   • Respiration:      {dynamic['respiration']}")
+        oled_print(oled,f"   • Temperature:      {dynamic['temperature']}")
+        oled_print(oled,"   • No aggression detected.")
+        oled_print(oled,"   • No medical issues detected.")
+        oled_print(oled,"   • Continuing normal monitoring...")
         return
 
 # -----------------------------
@@ -515,12 +524,15 @@ def post_to_supabase(report_path, audio_path):
         print(f"❌ Error posting to Supabase: {e}")
         raise
 
+def oled_print(oled, text):
+    print(text)                 # terminal
+    oled.display_text_upside_down(text, 18)  # OLED
+
 
 # -----------------------------
 # MAIN LOOP
 # -----------------------------
 def main():
-    # Create output folder
     session_ts = datetime.now().strftime("%Y%m%d_%H%M%S")
     session_datetime = datetime.now()
     session_date_str = session_datetime.strftime("%B %d, %Y")
@@ -529,10 +541,7 @@ def main():
     session_folder = f"output/session_{session_ts}"
     os.makedirs(session_folder, exist_ok=True)
 
-    cap = cv2.VideoCapture(0)
-    if not cap.isOpened():
-        print("❌ Webcam error")
-        return
+    print("📸 Using rpicam-still capture mode (no /dev/video0 required)")
 
     audio_filename = f"audio_{session_ts}.wav"
 
@@ -542,7 +551,7 @@ def main():
     frames_collected = []
     events = []
 
-    print("🎥 Monitoring started... Press Q to quit.")
+    oled_print(oled, "Monitoring...")
 
     last_audio_time = 0
     last_frame_time = 0
@@ -550,14 +559,20 @@ def main():
 
     try:
         while True:
-            ret, frame = cap.read()
-            if not ret:
+            # -------------------------
+            # CAPTURE FRAME FROM PI CAM
+            # -------------------------
+            frame = capture_frame()
+            if frame is None:
+                print("⚠️ Frame capture failed, retrying...")
                 continue
 
             frames_collected.append(frame.copy())
             now = time.time()
 
-            # AUDIO SAMPLE EVERY 5s
+            # ------------------------------------
+            # AUDIO CHUNK EVERY 5 SECONDS
+            # ------------------------------------
             if now - last_audio_time > 5:
                 chunk_file = "temp_audio.wav"
                 audio_rec.save_chunk(chunk_file)
@@ -565,16 +580,21 @@ def main():
                 text = transcribe_chunk(chunk_file)
                 if text:
                     audio_context.append(text)
+
                     if detect_shutdown_command(text):
-                        print("\n🛑 Voice shutdown command detected!")
+                        oled_print(oled, "\n🛑 Voice shutdown command detected!")
                         print("   → Ending session safely...\n")
                         break
+
                     issue = detect_audio_keywords(text)
                     if issue:
                         print(f"🚨 AUDIO FLAG: {issue}")
+
                 last_audio_time = now
 
-            # FRAME ANALYSIS EVERY 1.5s
+            # ------------------------------------
+            # FRAME ANALYSIS EVERY 1.5 SECONDS
+            # ------------------------------------
             if now - last_frame_time > 1.5:
                 result = analyze_frame(frame)
                 result["timestamp"] = now - session_start
@@ -589,6 +609,7 @@ def main():
                 realtime_routing_alert(result)
                 last_frame_time = now
 
+            # Manual shutdown support
             key = cv2.waitKey(1) & 0xFF
             if key == ord("q") or key == ord("s"):
                 print("\n🛑 Manual shutdown triggered.")
@@ -598,8 +619,6 @@ def main():
         pass
 
     print("\n🛑 Ending session...")
-    cap.release()
-    cv2.destroyAllWindows()
 
     audio_rec.stop_and_save_full_audio(audio_filename)
 
@@ -612,7 +631,3 @@ def main():
     save_output(report, audio_filename, frames_collected, session_folder)
 
     print("\n✅ Session complete.")
-
-
-if __name__ == "__main__":
-    main()
