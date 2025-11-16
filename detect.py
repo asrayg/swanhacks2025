@@ -13,7 +13,9 @@ import re
 import random
 import subprocess
 from supabase import create_client, Client
+from PIL import Image, ImageDraw, ImageFont
 from driver import OLED_1in51   # if driver.py is your screen driver
+from driver import OLED_1in51, OLED_WIDTH, OLED_HEIGHT
 import numpy as np
 
 load_dotenv()
