@@ -17,7 +17,7 @@ class SpanishEnglishTranslator:
         self.is_running = False
         self.sample_rate = 16000
         self.channels = 1
-        self.silence_threshold = 1500  # Energy threshold for silence
+        self.silence_threshold = 10000  # Energy threshold for silence
         self.silence_duration = 1.5  # Seconds of silence before stopping
         
     def record_with_silence_detection(self, max_duration=30):
