@@ -28,46 +28,33 @@ oled = None
 import time
 
 
-def oled_print(text, size=9):
+def oled_speaking_animation(duration=3.0, speed=0.08):
+    """Cool Siri-style waveform animation while JARVIS is speaking."""
     global oled
+    if oled is None:
+        return
 
-    # Create blank image
-    image = Image.new("1", (OLED_WIDTH, OLED_HEIGHT), 255)
-    draw = ImageDraw.Draw(image)
+    start = time.time()
+    phase = 0
 
-    # Smaller readable font
-    try:
-        font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", size)
-    except:
-        font = ImageFont.load_default()
+    while time.time() - start < duration:
+        image = Image.new("1", (OLED_WIDTH, OLED_HEIGHT), 255)
+        draw = ImageDraw.Draw(image)
 
-    # Split text into lines (approx 18 chars/line)
-    words = text.split()
-    line = ""
-    lines = []
-    for w in words:
-        if len(line) + len(w) < 18:
-            line += " " + w
-        else:
-            lines.append(line.strip())
-            line = w
-    lines.append(line.strip())
+        # waveform
+        for x in range(0, OLED_WIDTH, 2):
+            y = int(32 + 20 * np.sin((x / 10.0) + phase))
+            draw.line((x, 32, x, y), fill=0)
 
-    # Draw max 4 lines
-    y = 0
-    for ln in lines[:4]:
-        draw.text((0, y), ln, font=font, fill=0)
-        y += size + 3
+        # upside-down for your display
+        image = image.rotate(180)
 
-    # Rotate entire screen upside down
-    image = image.rotate(180)
+        buf = oled.getbuffer(image)
+        oled.ShowImage(buf)
 
-    # Send output
-    buf = oled.getbuffer(image)
-    oled.ShowImage(buf)
+        phase += 0.25
+        time.sleep(speed)
 
-    # Slow output so text doesn’t flicker/flash too fast
-    time.sleep(0.4)
 
 
 class JARVIS:
