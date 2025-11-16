@@ -8,11 +8,10 @@ from JARVIS import create_jarvis
 from translate import SpanishEnglishTranslator
 import os
 from datetime import datetime
-import subprocess
+import threading
 import sys
-
-def start_detect_process():
-    return subprocess.Popen([sys.executable, "detect.py"])
+import time
+import detect
 
 
 def listen_for_wake_words(jarvis, frame_duration=2):
@@ -223,9 +222,19 @@ def main():
         translator.is_running = False
 
 if __name__ == "__main__":
-    detect_proc = start_detect_process()
-
+    # Start detect in a separate thread
+    detect_thread = threading.Thread(target=detect.main, daemon=True)
+    detect_thread.start()
+    
+    print("🎥 Detection system started in background thread")
+    print("   (Initializing webcam and audio monitoring...)\n")
+    
+    # Give detect thread time to initialize
+    time.sleep(2)
+    
     try:
-        main()  
-    finally:
-        detect_proc.terminate()
+        main()
+    except KeyboardInterrupt:
+        print("\n\n👋 Shutting down all systems...")
+    
+    print("✅ Main program exited. Detection thread will stop automatically.")
