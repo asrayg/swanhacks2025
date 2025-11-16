@@ -241,7 +241,7 @@ class SpanishEnglishTranslator:
                 audio_data = base64.b64encode(f.read()).decode('utf-8')
             
             response = client.chat.completions.create(
-                model="gpt-4o-transcribe",
+                model="gpt-4o-audio-preview",
                 modalities=["text"],
                 messages=[
                     {

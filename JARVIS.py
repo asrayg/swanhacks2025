@@ -365,7 +365,6 @@ Be helpful, accurate, and concise. Use provided context when available."""
                     transcription = self.client.audio.transcriptions.create(
                         model="whisper-1",
                         file=audio_file,
-                        language=lang_code
                     )
                 else:
                     transcription = self.client.audio.transcriptions.create(
