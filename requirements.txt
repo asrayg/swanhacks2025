@@ -16,7 +16,7 @@ flask>=3.0.0
 numpy>=1.24.0
 
 # Speech recognition
-# SpeechRecognition>=3.10.0  # No longer needed - using GPT-4o-transcribe instead
+# SpeechRecognition>=3.10.0  # No longer needed - using OpenAI Whisper-1 API instead
 sounddevice>=0.4.6  # For audio recording, works better with virtual devices
 # pyaudio>=0.2.13  # Note: May require system dependencies (portaudio19-dev on Linux) - REPLACED by sounddevice
 
