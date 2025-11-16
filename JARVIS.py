@@ -19,6 +19,55 @@ import io
 import wave
 import subprocess
 import tempfile
+from PIL import Image, ImageDraw, ImageFont
+import threading
+from driver import OLED_1in51, OLED_WIDTH, OLED_HEIGHT
+import numpy as np
+oled = None
+
+import time
+
+
+def oled_print(text, size=9):
+    global oled
+
+    # Create blank image
+    image = Image.new("1", (OLED_WIDTH, OLED_HEIGHT), 255)
+    draw = ImageDraw.Draw(image)
+
+    # Smaller readable font
+    try:
+        font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", size)
+    except:
+        font = ImageFont.load_default()
+
+    # Split text into lines (approx 18 chars/line)
+    words = text.split()
+    line = ""
+    lines = []
+    for w in words:
+        if len(line) + len(w) < 18:
+            line += " " + w
+        else:
+            lines.append(line.strip())
+            line = w
+    lines.append(line.strip())
+
+    # Draw max 4 lines
+    y = 0
+    for ln in lines[:4]:
+        draw.text((0, y), ln, font=font, fill=0)
+        y += size + 3
+
+    # Rotate entire screen upside down
+    image = image.rotate(180)
+
+    # Send output
+    buf = oled.getbuffer(image)
+    oled.ShowImage(buf)
+
+    # Slow output so text doesn’t flicker/flash too fast
+    time.sleep(0.4)
 
 
 class JARVIS:
@@ -867,83 +916,69 @@ Be helpful, accurate, and concise. Use provided context when available."""
             return None
     
     def speak(
-        self, 
-        text: str, 
-        voice: Optional[str] = None, 
-        save_to: Optional[str] = None
+    self, 
+    text: str, 
+    voice: Optional[str] = None, 
+    save_to: Optional[str] = None
     ) -> bool:
-        """
-        Speak text using OpenAI's TTS API and optionally save to file.
-        
-        Args:
-            text: The text to speak
-            voice: Voice to use (alloy, echo, fable, onyx, nova, shimmer)
-            save_to: Optional path to save the audio file (e.g., "output.mp3")
-        
-        Returns:
-            True if successful, False otherwise
-        """
+        """Speak text and show OLED speaking animation."""
         try:
             voice = voice or self.tts_voice
-            
-            # Generate speech using OpenAI TTS
+
+            # --- OLED SPEAKING ANIMATION THREAD ---
+            anim_thread = threading.Thread(
+                target=oled_speaking_animation,
+                args=(max(2.0, len(text) * 0.15),),   # automatically adjusted later
+                daemon=True
+            )
+            anim_thread.start()
+
+            # Generate audio
             response = self.client.audio.speech.create(
                 model=self.tts_model,
                 voice=voice,
                 input=text
             )
-            
-            # Determine file path
+
+            # Save
             if save_to:
-                # Save to specified file
                 audio_path = save_to
                 with open(audio_path, 'wb') as audio_file:
                     audio_file.write(response.content)
-                print(f"💾 Audio saved to: {audio_path}")
                 should_delete = False
             else:
-                # Save to temporary file
                 with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as temp_audio:
                     temp_audio.write(response.content)
                     audio_path = temp_audio.name
                 should_delete = True
-            
-            # Try to play using available audio player
-            try:
-                # Try mpv (common on Linux)
-                subprocess.run(
-                    ["mpv", "--really-quiet", audio_path],
-                    check=True,
-                    capture_output=True
-                )
-            except (FileNotFoundError, subprocess.CalledProcessError):
+
+            # Play audio
+            played = False
+            for cmd in [
+                ["mpv", "--really-quiet", audio_path],
+                ["ffplay", "-nodisp", "-autoexit", "-loglevel", "quiet", audio_path],
+                ["paplay", audio_path],
+            ]:
                 try:
-                    # Try ffplay (from ffmpeg)
-                    subprocess.run(
-                        ["ffplay", "-nodisp", "-autoexit", "-loglevel", "quiet", audio_path],
-                        check=True,
-                        capture_output=True
-                    )
-                except (FileNotFoundError, subprocess.CalledProcessError):
-                    # Try paplay (PulseAudio)
-                    subprocess.run(
-                        ["paplay", audio_path],
-                        check=True,
-                        capture_output=True
-                    )
-            
-            # Clean up temp file if needed
+                    subprocess.run(cmd, check=True, capture_output=True)
+                    played = True
+                    break
+                except:
+                    pass
+
+            # wait for animation to end
+            anim_thread.join(timeout=0.1)
+
+            # cleanup
             if should_delete:
                 os.remove(audio_path)
-            
-            return True
-            
+
+            return played
+
         except Exception as e:
             print(f"❌ Error speaking: {e}")
-            import traceback
-            traceback.print_exc()
             return False
-    
+
     def listen_and_ask(
         self,
         duration: int = 5,
