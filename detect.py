@@ -56,7 +56,7 @@ security_units = {
     "Unit B": "4 minutes away"
 }
 
-def oled_print(text, size=6):
+def oled_print(text, size=9):
     global oled, oled_control_lock
     
     # Check if JARVIS/translator has control - if so, skip update
