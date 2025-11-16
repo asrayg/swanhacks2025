@@ -584,6 +584,11 @@ Be helpful, accurate, and concise. Use provided context when available."""
             )
             sd.wait()  # Wait until recording is finished
             
+            # Debug: Check audio levels
+            audio_max = np.abs(audio_data).max()
+            if audio_max < 100:  # Very quiet audio
+                print(f"⚠️ Warning: Audio level very low ({audio_max}). Check microphone volume!")
+            
             # Convert to WAV format in memory
             wav_io = io.BytesIO()
             with wave.open(wav_io, 'wb') as wav_file:
@@ -608,12 +613,16 @@ Be helpful, accurate, and concise. Use provided context when available."""
             return text
         
         except sr.UnknownValueError:
+            # Google couldn't understand the audio
+            # This usually means audio is too quiet, corrupted, or just silence/noise
             return None
         
-        except sr.RequestError:
+        except sr.RequestError as e:
+            print(f"❌ Google API request failed: {e}")
             return None
         
-        except Exception:
+        except Exception as e:
+            print(f"❌ Recognition error: {e}")
             return None
     
     def listen_with_silence_detection(
